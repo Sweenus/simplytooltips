@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "id": "simplytooltips",
+  "version": "${version}",
+  "name": "Simply Tooltips",
+  "description": "Standalone modern tooltip renderer for Simply mods. Optionally available for other vanilla and modded items.",
+  "authors": [
+    "Sweenus"
+  ],
+  "license": "All-Rights-Reserved",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "net.sweenus.simplytooltips.fabric.SimplyTooltipsFabric"
+    ],
+    "client": [
+      "net.sweenus.simplytooltips.fabric.client.SimplyTooltipsFabricClient"
+    ]
+  },
+  "mixins": [
+    "simplytooltips.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.17.2",
+    "minecraft": "~1.21.1",
+    "java": ">=21",
+    "architectury": ">=13.0.8",
+    "fabric-api": "*"
+  }
+}

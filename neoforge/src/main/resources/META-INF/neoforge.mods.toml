@@ -1,0 +1,36 @@
+modLoader = "javafml"
+loaderVersion = "[2,)"
+license = "All Rights Reserved"
+
+[[mods]]
+modId = "simplytooltips"
+version = "${version}"
+displayName = "Simply Tooltips"
+authors = "Sweenus"
+description = '''
+Standalone modern tooltip renderer for Simply mods. Optionally available for other vanilla and modded items.
+'''
+
+[[dependencies.simplytooltips]]
+modId = "neoforge"
+type = "required"
+versionRange = "[21,)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.simplytooltips]]
+modId = "minecraft"
+type = "required"
+versionRange = "[1.21.1,)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.simplytooltips]]
+modId = "architectury"
+type = "required"
+versionRange = "[13.0.8,)"
+ordering = "AFTER"
+side = "BOTH"
+
+[[mixins]]
+config = "simplytooltips.mixins.json"
