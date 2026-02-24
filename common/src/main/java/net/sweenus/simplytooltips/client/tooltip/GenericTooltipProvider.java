@@ -1,6 +1,7 @@
 package net.sweenus.simplytooltips.client.tooltip;
 
 import net.minecraft.item.ItemStack;
+import net.minecraft.item.Items;
 import net.minecraft.text.Text;
 import net.sweenus.simplytooltips.api.ModernTooltipModel;
 import net.sweenus.simplytooltips.api.TooltipBorderStyle;
@@ -26,6 +27,20 @@ public final class GenericTooltipProvider implements TooltipProvider {
         List<String> bodyLines = new ArrayList<>();
         List<Text> extraLines = new ArrayList<>();
 
+        int borderStyle = TooltipBorderStyle.DEFAULT;
+        TooltipTheme theme = TooltipTheme.defaultTheme();
+
+        if (stack.isOf(Items.IRON_SWORD)) {
+            borderStyle = TooltipBorderStyle.LIGHTNING;
+            theme = new TooltipTheme(
+                    0xFFE6EEFF, 0xFF6A7DAA, 0xF0141D2E, 0xF00B111D,
+                    0xFFF4F7FF, 0xFFDCE8FF, 0xFF0A0F18, 0xFFD4E0FF,
+                    0xFFE2E9FA, 0xFF859CD6, 0xFFE6EEFF, 0xFF152036,
+                    0xFF859CD6, 0xFFB8C8FF, 0xFF8DB8FF, 0xFF9FB1FF,
+                    0xFFC6D8FF, 0xFF232D40, 0xFFD4DEEF
+            );
+        }
+
         // Lines before the first blank line → body; lines after → extras (enchantments etc.)
         boolean pastBlank = false;
         for (int i = 1; i < rawLines.size(); i++) {
@@ -44,11 +59,11 @@ public final class GenericTooltipProvider implements TooltipProvider {
         return new ModernTooltipModel(
                 title,
                 List.of("ITEM"),
-                TooltipBorderStyle.DEFAULT,
+                borderStyle,
                 List.of(),
                 bodyLines,
                 extraLines,
-                TooltipTheme.defaultTheme(),
+                theme,
                 null,
                 null
         );
