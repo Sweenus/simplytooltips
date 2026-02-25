@@ -20,7 +20,7 @@
   "hint":              "0xFFF0E4FF",
   "motif":             "enchanted",
   "itemAnimStyle":     "breathe_spin_bob",
-  "titleAnimStyle":    "shiver",
+  "titleAnimStyle":    "hinge_fall",
   "itemBorderShape":   "diamond",
   "customTextKeys":    []
 }

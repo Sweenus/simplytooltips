@@ -44,6 +44,8 @@ public record ThemeDefinition(
          *   <li>{@code "shiver"}  — per-letter jitter / shivering effect
          *   <li>{@code "quiver"}  — very subtle slow micro-jitter (legacy subtle shiver look)
          *   <li>{@code "breathe_spin_bob"} — combined scale pulse + gentle tilt + vertical bob
+         *   <li>{@code "drop_bounce"} — letters drop from above, bounce once, then stay static
+         *   <li>{@code "hinge_fall"} — one random letter loosens, swings, and falls away permanently per tooltip open
          *   <li>{@code "static"}  — no animation, plain text
          * </ul>
          */

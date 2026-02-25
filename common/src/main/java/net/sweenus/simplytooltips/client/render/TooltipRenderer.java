@@ -224,6 +224,8 @@ public class TooltipRenderer {
             case "shiver", "shivering" -> TooltipPainter.drawShiverText(context, tr, model.title(), nameX, nameY, theme.name(), iconTimeMs);
             case "quiver"  -> TooltipPainter.drawQuiverText(context, tr, model.title(), nameX, nameY, theme.name(), iconTimeMs);
             case "breathe_spin_bob" -> TooltipPainter.drawBreatheSpinBobText(context, tr, model.title(), nameX, nameY, theme.name(), iconTimeMs);
+            case "drop_bounce" -> TooltipPainter.drawDropBounceText(context, tr, model.title(), nameX, nameY, theme.name(), tooltipElapsedMs);
+            case "hinge_fall" -> TooltipPainter.drawHingeFallText(context, tr, model.title(), nameX, nameY, theme.name(), tooltipElapsedMs);
             case "static"  -> context.drawText(tr, Text.literal(model.title()).setStyle(
                                   Style.EMPTY.withColor(TextColor.fromRgb(theme.name() & 0x00FFFFFF))),
                                   nameX, nameY, theme.name(), true);

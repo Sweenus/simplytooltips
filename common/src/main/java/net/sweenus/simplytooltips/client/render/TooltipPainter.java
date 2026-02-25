@@ -10,6 +10,7 @@ import net.sweenus.simplytooltips.api.TooltipTheme;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * Static utility methods for drawing common tooltip elements:
@@ -17,6 +18,14 @@ import java.util.List;
  * animated title text, plus colour helpers and word-wrap.
  */
 public class TooltipPainter {
+
+    // State for one-shot "hinge_fall" title animation (resets when tooltip animation resets).
+    private static long   hingeLastElapsedMs = -1L;
+    private static int    hingeTargetIndex   = -1;
+    private static long   hingeStartDelayMs  = 0L;
+    private static int    hingeDirection     = 1;
+    private static float  hingeDrift         = 0.0F;
+    private static String hingeLastText      = "";
 
     // --- Background ---
 
@@ -405,6 +414,212 @@ public class TooltipPainter {
                 x, y, color, true);
 
         context.getMatrices().pop();
+    }
+
+    /**
+     * Draws {@code text} where characters drop in from above, bounce briefly,
+     * then settle to a static position until the tooltip closes.
+     *
+     * @param elapsedMs tooltip-lifetime elapsed milliseconds (not absolute wall-clock time)
+     */
+    public static void drawDropBounceText(DrawContext context, TextRenderer tr, String text,
+                                          int x, int y, int color, long elapsedMs) {
+        if (text == null || text.isEmpty()) return;
+
+        final long charDelayMs   = 34L;
+        final long dropDuration  = 230L;
+        final long bounceWindow  = 280L;
+        final double dropStartY  = -10.0;
+
+        int cursorX = x;
+        for (int i = 0; i < text.length(); i++) {
+            String ch = String.valueOf(text.charAt(i));
+            int charW = tr.getWidth(ch);
+
+            long tChar = elapsedMs - (i * charDelayMs);
+            int yOffset;
+
+            if (tChar <= 0L) {
+                yOffset = (int) Math.round(dropStartY);
+            } else if (tChar < dropDuration) {
+                double p = (double) tChar / (double) dropDuration;
+                double eased = 1.0 - Math.pow(1.0 - p, 3.0); // ease-out cubic
+                yOffset = (int) Math.round(dropStartY * (1.0 - eased));
+            } else {
+                long tBounce = tChar - dropDuration;
+                if (tBounce < bounceWindow) {
+                    double osc = Math.sin(tBounce * 0.040) * 1.9;
+                    double damp = Math.exp(-tBounce / 120.0);
+                    yOffset = (int) Math.round(osc * damp);
+                } else {
+                    yOffset = 0;
+                }
+            }
+
+            context.drawText(tr,
+                    Text.literal(ch).setStyle(Style.EMPTY.withColor(TextColor.fromRgb(color & 0x00FFFFFF))),
+                    cursorX, y + yOffset, color, true);
+
+            cursorX += charW;
+        }
+    }
+
+    /**
+     * Draws text that starts static, then one random non-space character loosens,
+     * swings on a hinge, and falls away permanently until tooltip reopen/reset.
+     *
+     * <p>Use tooltip elapsed time so the sequence is one-shot per tooltip session.
+     */
+    public static void drawHingeFallText(DrawContext context, TextRenderer tr, String text,
+                                         int x, int y, int color, long elapsedMs) {
+        if (text == null || text.isEmpty()) return;
+
+        final long introCharDelayMs = 16L;
+        final long introDropMs      = 170L;
+        final long introImpactMs    = 180L;
+        final long introTotalMs     = introDropMs + introImpactMs + (text.length() - 1L) * introCharDelayMs;
+
+        // Reset one-shot state whenever tooltip animation lifetime resets.
+        if (elapsedMs < hingeLastElapsedMs || !text.equals(hingeLastText) || hingeTargetIndex < 0) {
+            int[] candidates = text.chars()
+                    .map(c -> (char) c)
+                    .map(ch -> Character.isWhitespace(ch) ? -1 : 1)
+                    .toArray();
+
+            int count = 0;
+            for (int v : candidates) if (v == 1) count++;
+
+            if (count > 0) {
+                int pick = ThreadLocalRandom.current().nextInt(count);
+                int seen = 0;
+                for (int i = 0; i < candidates.length; i++) {
+                    if (candidates[i] == 1) {
+                        if (seen == pick) {
+                            hingeTargetIndex = i;
+                            break;
+                        }
+                        seen++;
+                    }
+                }
+            } else {
+                hingeTargetIndex = -1;
+            }
+
+            hingeStartDelayMs = introTotalMs + 430L + ThreadLocalRandom.current().nextLong(280L);
+            hingeDirection    = ThreadLocalRandom.current().nextBoolean() ? 1 : -1;
+            hingeDrift        = (float) ThreadLocalRandom.current().nextDouble(-1.0, 1.0);
+            hingeLastText     = text;
+        }
+
+        hingeLastElapsedMs = elapsedMs;
+
+        final long swingMs = 780L;
+        final long fallMs  = 980L;
+
+        // Opening slam: all characters drop from above, hit hard, then settle.
+        if (elapsedMs < introTotalMs) {
+            int cursorXIntro = x;
+            for (int i = 0; i < text.length(); i++) {
+                String ch = String.valueOf(text.charAt(i));
+                int charW = tr.getWidth(ch);
+
+                long tChar = elapsedMs - (i * introCharDelayMs);
+                int yOffset;
+                if (tChar <= 0L) {
+                    yOffset = -28;
+                } else if (tChar < introDropMs) {
+                    double p = (double) tChar / (double) introDropMs;
+                    yOffset = (int) Math.round(-28.0 * (1.0 - (p * p)));
+                } else {
+                    long tImpact = tChar - introDropMs;
+                    if (tImpact < introImpactMs) {
+                        double shock = Math.sin(tImpact * 0.22) * 4.2;
+                        double damp  = Math.exp(-tImpact / 70.0);
+                        yOffset = (int) Math.round(shock * damp);
+                    } else {
+                        yOffset = 0;
+                    }
+                }
+
+                context.drawText(tr,
+                        Text.literal(ch).setStyle(Style.EMPTY.withColor(TextColor.fromRgb(color & 0x00FFFFFF))),
+                        cursorXIntro, y + yOffset, color, true);
+                cursorXIntro += charW;
+            }
+            return;
+        }
+
+        int cursorX = x;
+        for (int i = 0; i < text.length(); i++) {
+            String ch = String.valueOf(text.charAt(i));
+            int charW = tr.getWidth(ch);
+
+            // Non-target characters remain static for the entire tooltip session.
+            if (i != hingeTargetIndex) {
+                context.drawText(tr,
+                        Text.literal(ch).setStyle(Style.EMPTY.withColor(TextColor.fromRgb(color & 0x00FFFFFF))),
+                        cursorX, y, color, true);
+                cursorX += charW;
+                continue;
+            }
+
+            long t = elapsedMs - hingeStartDelayMs;
+
+            // Before loosening, target character is still static.
+            if (t <= 0L) {
+                context.drawText(tr,
+                        Text.literal(ch).setStyle(Style.EMPTY.withColor(TextColor.fromRgb(color & 0x00FFFFFF))),
+                        cursorX, y, color, true);
+                cursorX += charW;
+                continue;
+            }
+
+            // Swinging phase: hinged near top-left corner of glyph.
+            if (t < swingMs) {
+                float p = (float) t / (float) swingMs;
+                float amp = 6.0F + (14.0F * p);
+                float angle = (float) (Math.sin(p * Math.PI * 3.4) * amp) * hingeDirection;
+
+                context.getMatrices().push();
+                float pivotX = cursorX + 0.5F;
+                float pivotY = y + 0.5F;
+                context.getMatrices().translate(pivotX, pivotY, 0.0F);
+                context.getMatrices().multiply(RotationAxis.POSITIVE_Z.rotationDegrees(angle));
+                context.getMatrices().translate(-pivotX, -pivotY, 0.0F);
+                context.drawText(tr,
+                        Text.literal(ch).setStyle(Style.EMPTY.withColor(TextColor.fromRgb(color & 0x00FFFFFF))),
+                        cursorX, y, color, true);
+                context.getMatrices().pop();
+
+                cursorX += charW;
+                continue;
+            }
+
+            // Falling phase: character peels off and drops out of view.
+            long tf = t - swingMs;
+            if (tf < fallMs) {
+                float dx = hingeDrift * (tf * 0.018F);
+                float dy = (tf * 0.060F) + (tf * tf * 0.00020F);
+                float spin = hingeDirection * (10.0F + (tf * 0.17F));
+
+                float drawX = cursorX + dx;
+                float drawY = y + dy;
+                float centerX = drawX + (charW / 2.0F);
+                float centerY = drawY + (tr.fontHeight / 2.0F);
+
+                context.getMatrices().push();
+                context.getMatrices().translate(centerX, centerY, 0.0F);
+                context.getMatrices().multiply(RotationAxis.POSITIVE_Z.rotationDegrees(spin));
+                context.getMatrices().translate(-centerX, -centerY, 0.0F);
+                context.drawText(tr,
+                        Text.literal(ch).setStyle(Style.EMPTY.withColor(TextColor.fromRgb(color & 0x00FFFFFF))),
+                        (int) drawX, (int) drawY, color, true);
+                context.getMatrices().pop();
+            }
+            // After fall phase: do not draw this character anymore in current tooltip session.
+
+            cursorX += charW;
+        }
     }
 
     // --- Colour helpers ---

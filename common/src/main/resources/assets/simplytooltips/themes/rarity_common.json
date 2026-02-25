@@ -20,7 +20,7 @@
   "hint":              "0xFFDDDDDD",
   "motif":             "none",
   "itemAnimStyle":     "breathe_spin_bob",
-  "titleAnimStyle":    "wave",
+  "titleAnimStyle":    "static",
   "itemBorderShape":   "diamond",
   "customTextKeys":    []
 }
