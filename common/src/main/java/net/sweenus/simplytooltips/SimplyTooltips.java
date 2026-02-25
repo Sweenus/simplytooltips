@@ -2,6 +2,7 @@ package net.sweenus.simplytooltips;
 
 import net.sweenus.simplytooltips.api.TooltipProviderRegistry;
 import net.sweenus.simplytooltips.client.tooltip.GenericTooltipProvider;
+import net.sweenus.simplytooltips.config.SimplyTooltipsConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -18,6 +19,7 @@ public final class SimplyTooltips {
         if (initialized) return;
         initialized = true;
 
+        LOGGER.info("SimplyTooltips config loaded: {}", SimplyTooltipsConfig.INSTANCE.getId());
         TooltipProviderRegistry.register(new GenericTooltipProvider(), 0);
     }
 }

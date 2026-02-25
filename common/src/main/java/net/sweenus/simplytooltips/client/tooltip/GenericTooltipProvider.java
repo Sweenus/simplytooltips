@@ -51,7 +51,8 @@ public final class GenericTooltipProvider implements TooltipProvider {
                 TooltipTheme.defaultTheme(),
                 null,
                 null,
-                null  // themeKey=null: TooltipRenderer handles item/tag/rarity resolution
+                null,  // themeKey=null: TooltipRenderer handles item/tag/rarity resolution
+                null   // hint=null
         );
     }
 }

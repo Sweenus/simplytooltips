@@ -14,6 +14,7 @@ import net.minecraft.util.math.RotationAxis;
 import net.sweenus.simplytooltips.api.*;
 import net.sweenus.simplytooltips.client.TooltipNavigationConfig;
 import net.sweenus.simplytooltips.client.render.motif.BackgroundMotif;
+import net.sweenus.simplytooltips.config.SimplyTooltipsConfig;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -24,9 +25,11 @@ import java.util.List;
  */
 public class TooltipRenderer {
 
-    private static final int PADDING       = 10;
-    private static final int LINE_SPACING  = 1;
-    private static final int MAX_TEXT_WIDTH = 200;
+    private static int padding()      { return SimplyTooltipsConfig.INSTANCE.layout.padding.get(); }
+    private static int lineSpacing()  { return SimplyTooltipsConfig.INSTANCE.layout.lineSpacing.get(); }
+    private static int maxTextWidth() { return SimplyTooltipsConfig.INSTANCE.layout.maxTextWidth.get(); }
+    /** Hard cap on body viewport height before scroll activates (~17 lines at default). */
+    private static int maxBodyH()     { return SimplyTooltipsConfig.INSTANCE.layout.maxBodyHeight.get(); }
 
     /**
      * Renders a full modern tooltip for the given item stack.
@@ -69,11 +72,11 @@ public class TooltipRenderer {
         long tooltipElapsedMs = TooltipAnimator.updateAndGetElapsed(stack, model.animKeyExtra());
 
         // ---- Text wrapping ----
-        List<String> wrappedAbility = TooltipPainter.wrapStrings(model.abilityLines(), tr, MAX_TEXT_WIDTH);
-        List<String> wrappedBody    = TooltipPainter.wrapStrings(model.bodyLines(), tr, MAX_TEXT_WIDTH);
+        List<String> wrappedAbility = TooltipPainter.wrapStrings(model.abilityLines(), tr, maxTextWidth());
+        List<String> wrappedBody    = TooltipPainter.wrapStrings(model.bodyLines(), tr, maxTextWidth());
         List<String> wrappedExtra   = new ArrayList<>();
         for (Text t : model.extraLines()) {
-            wrappedExtra.addAll(TooltipPainter.wrapStrings(List.of(t.getString()), tr, MAX_TEXT_WIDTH));
+            wrappedExtra.addAll(TooltipPainter.wrapStrings(List.of(t.getString()), tr, maxTextWidth()));
         }
 
         // ---- Tab and scroll state ----
@@ -81,24 +84,25 @@ public class TooltipRenderer {
         ScrollState.notifyItem(itemId);
 
         List<TabState.Tab> availableTabs = new ArrayList<>();
-        if (TooltipNavigationConfig.TOOLTIP_TABS) {
+        if (TooltipNavigationConfig.tooltipTabs()) {
             if (!wrappedAbility.isEmpty())                                    availableTabs.add(TabState.Tab.LORE);
             if (model.upgradeSection() != null)                               availableTabs.add(TabState.Tab.FORGE);
             if (!wrappedBody.isEmpty() || !wrappedExtra.isEmpty())            availableTabs.add(TabState.Tab.STATS);
             TabState.notifyItem(itemId, availableTabs);
         }
 
-        boolean tabsActive = TooltipNavigationConfig.TOOLTIP_TABS && TabState.multiTab();
+        boolean tabsActive = TooltipNavigationConfig.tooltipTabs() && TabState.multiTab();
         boolean drawLore   = !tabsActive || TabState.activeTab() == TabState.Tab.LORE;
         boolean drawForge  = !tabsActive || TabState.activeTab() == TabState.Tab.FORGE;
         boolean drawStats  = !tabsActive || TabState.activeTab() == TabState.Tab.STATS;
 
         // ---- Layout ----
-        int lineHeight  = tr.fontHeight + LINE_SPACING;
+        int lineHeight  = tr.fontHeight + lineSpacing();
         int upgradeRowH = lineHeight + 3;
         int sectionGap  = 4;
         int iconAreaW   = 36;
-        int headerH     = PADDING + 16 + 6 + 12 + PADDING;
+        int hintRowH    = (model.hint() != null) ? lineHeight + 2 : 0;
+        int headerH     = padding() + 16 + 6 + 12 + hintRowH + padding();
         int separatorH  = 10;
 
         boolean hasAbility = !wrappedAbility.isEmpty();
@@ -108,7 +112,7 @@ public class TooltipRenderer {
         UpgradeSection upgradeSection = model.upgradeSection();
         boolean hasUpgrade = upgradeSection != null;
         List<String> wrappedRuneEffect = hasUpgrade
-                ? TooltipPainter.wrapStrings(upgradeSection.rune().effectLines(), tr, MAX_TEXT_WIDTH)
+                ? TooltipPainter.wrapStrings(upgradeSection.rune().effectLines(), tr, maxTextWidth())
                 : List.of();
         boolean hasBodyContent = (hasAbility && drawLore)
                 || (hasUpgrade && drawForge)
@@ -117,7 +121,12 @@ public class TooltipRenderer {
         // Panel width
         int textContentW = 0;
         textContentW = Math.max(textContentW, tr.getWidth(model.title()) + iconAreaW + 4);
-        for (String s : wrappedAbility) textContentW = Math.max(textContentW, tr.getWidth(s));
+        for (String s : wrappedAbility) {
+            // Strip SECTION_MARKER and add "◆ " prefix for accurate width measurement
+            String measured = s.startsWith(ModernTooltipModel.SECTION_MARKER)
+                    ? "\u25C6 " + s.substring(ModernTooltipModel.SECTION_MARKER.length()) : s;
+            textContentW = Math.max(textContentW, tr.getWidth(measured));
+        }
         for (String s : wrappedBody)    textContentW = Math.max(textContentW, tr.getWidth(s));
         for (String s : wrappedExtra)   textContentW = Math.max(textContentW, tr.getWidth(s));
 
@@ -129,7 +138,7 @@ public class TooltipRenderer {
                 int iconW    = tr.getWidth(row.icon() + " ");
                 int lblW     = tr.getWidth(row.label() + "  ") + 2;
                 int contentW = altDown
-                    ? Math.min(iconW + lblW + tr.getWidth(row.altText()), MAX_TEXT_WIDTH)
+                    ? Math.min(iconW + lblW + tr.getWidth(row.altText()), maxTextWidth())
                     : iconW + lblW + row.max() * 7;
                 textContentW = Math.max(textContentW, contentW);
             }
@@ -146,13 +155,24 @@ public class TooltipRenderer {
             textContentW = Math.max(textContentW, iconAreaW + totalBadgeW + 4);
         }
 
+        if (model.hint() != null) {
+            textContentW = Math.max(textContentW, iconAreaW + tr.getWidth(model.hint().getString()) + 4);
+        }
+
         textContentW = Math.max(textContentW, 150);
-        int panelW   = PADDING + textContentW + PADDING;
+        int panelW   = padding() + textContentW + padding();
 
         // Panel height — each section is gated by its draw-tab boolean
         int bodyH = 0;
         if (hasAbility && drawLore) {
-            bodyH += lineHeight + sectionGap + wrappedAbility.size() * lineHeight;
+            bodyH += lineHeight + sectionGap; // "◆ Description" header
+            for (String line : wrappedAbility) {
+                if (line.startsWith(ModernTooltipModel.SECTION_MARKER)) {
+                    bodyH += separatorH + lineHeight + sectionGap; // separator + sub-header
+                } else {
+                    bodyH += lineHeight;
+                }
+            }
         }
         if (hasAbility && drawLore && hasUpgrade && drawForge) bodyH += separatorH;
         if (hasUpgrade && drawForge) {
@@ -177,9 +197,11 @@ public class TooltipRenderer {
         if (panelY + panelH > screenH - 6) panelY = screenH - panelH - 6;
         if (panelY < 6) panelY = 6;
 
-        // Scroll clamping — clamp body height to screen-safe maximum and activate scroll if needed
-        final int MAX_BODY_H   = screenH - headerH - footerH - (hasBodyContent ? separatorH : 0) - 24;
-        final boolean scrollActive = TooltipNavigationConfig.SCROLLABLE_TOOLTIP && bodyH > MAX_BODY_H;
+        // Scroll clamping — clamp body height to the smaller of screen-safe max and a fixed viewport cap
+        final int MAX_BODY_H   = Math.min(
+                screenH - headerH - footerH - (hasBodyContent ? separatorH : 0) - 24,
+                maxBodyH());
+        final boolean scrollActive = TooltipNavigationConfig.scrollableTooltip() && bodyH > MAX_BODY_H;
         final int clampedBodyH = scrollActive ? MAX_BODY_H : bodyH;
         final int scrollMax    = scrollActive ? (bodyH - clampedBodyH) : 0;
         if (scrollActive) {
@@ -196,10 +218,10 @@ public class TooltipRenderer {
 
         BorderRenderer.drawDecorativeBorder(context, panelX, panelY, panelW, panelH, theme, borderStyle);
 
-        int cursorY = panelY + PADDING;
+        int cursorY = panelY + padding();
 
         // ---- Header: item icon ----
-        int iconFrameX = panelX + PADDING + 2;
+        int iconFrameX = panelX + padding() + 2;
         int iconFrameY = cursorY + 2;
         TooltipPainter.drawItemFrame(context, iconFrameX, iconFrameY, 24, theme, itemBorderShape);
 
@@ -248,7 +270,7 @@ public class TooltipRenderer {
         context.getMatrices().pop();
 
         // ---- Header: title + badges ----
-        int nameX = panelX + PADDING + iconAreaW;
+        int nameX = panelX + padding() + iconAreaW;
         int nameY = cursorY + 4;
         switch (titleAnimStyle != null ? titleAnimStyle : "wave") {
             case "shimmer" -> TooltipPainter.drawShimmerText(context, tr, model.title(), nameX, nameY, theme.name(), iconTimeMs);
@@ -280,11 +302,16 @@ public class TooltipRenderer {
             }
         }
 
+        if (model.hint() != null) {
+            int hintY = badgeY + tr.fontHeight + 2;
+            context.drawText(tr, model.hint(), nameX, hintY, theme.body(), false);
+        }
+
         cursorY = panelY + headerH;
 
         // ---- Separator after header ----
         if (hasBodyContent) {
-            TooltipPainter.drawSeparator(context, panelX + PADDING, cursorY, panelW - PADDING * 2, theme);
+            TooltipPainter.drawSeparator(context, panelX + padding(), cursorY, panelW - padding() * 2, theme);
             cursorY += separatorH;
         }
 
@@ -302,26 +329,38 @@ public class TooltipRenderer {
             context.drawText(tr,
                     Text.literal("\u25C6 Description").setStyle(Style.EMPTY.withColor(
                             TextColor.fromRgb(theme.sectionHeader() & 0x00FFFFFF))),
-                    panelX + PADDING, cursorY, theme.sectionHeader(), true);
+                    panelX + padding(), cursorY, theme.sectionHeader(), true);
             cursorY += lineHeight + sectionGap;
             for (String line : wrappedAbility) {
-                context.drawText(tr,
-                        Text.literal(line).setStyle(Style.EMPTY.withColor(
-                                TextColor.fromRgb(theme.body() & 0x00FFFFFF))),
-                        panelX + PADDING, cursorY, theme.body(), true);
-                cursorY += lineHeight;
+                if (line.startsWith(ModernTooltipModel.SECTION_MARKER)) {
+                    // Sub-section header: separator + "◆ " label in sectionHeader colour
+                    String headerText = "\u25C6 " + line.substring(ModernTooltipModel.SECTION_MARKER.length());
+                    TooltipPainter.drawSeparator(context, panelX + padding(), cursorY, panelW - padding() * 2, theme);
+                    cursorY += separatorH;
+                    context.drawText(tr,
+                            Text.literal(headerText).setStyle(Style.EMPTY.withColor(
+                                    TextColor.fromRgb(theme.sectionHeader() & 0x00FFFFFF))),
+                            panelX + padding(), cursorY, theme.sectionHeader(), true);
+                    cursorY += lineHeight + sectionGap;
+                } else {
+                    context.drawText(tr,
+                            Text.literal(line).setStyle(Style.EMPTY.withColor(
+                                    TextColor.fromRgb(theme.body() & 0x00FFFFFF))),
+                            panelX + padding(), cursorY, theme.body(), true);
+                    cursorY += lineHeight;
+                }
             }
         }
 
         // ---- Separator between ability and upgrades ----
         if (hasAbility && drawLore && hasUpgrade && drawForge) {
-            TooltipPainter.drawSeparator(context, panelX + PADDING, cursorY, panelW - PADDING * 2, theme);
+            TooltipPainter.drawSeparator(context, panelX + padding(), cursorY, panelW - padding() * 2, theme);
             cursorY += separatorH;
         }
 
         // ---- Upgrade section ----
         if (hasUpgrade && drawForge) {
-            int leftX = panelX + PADDING;
+            int leftX = panelX + padding();
             context.drawText(tr,
                     Text.literal("\u25C6 Upgrades").setStyle(Style.EMPTY.withColor(
                             TextColor.fromRgb(theme.sectionHeader() & 0x00FFFFFF))),
@@ -420,7 +459,7 @@ public class TooltipRenderer {
 
         // ---- Separator between (ability/upgrades) and body ----
         if ((hasAbility && drawLore || hasUpgrade && drawForge) && hasBody && drawStats) {
-            TooltipPainter.drawSeparator(context, panelX + PADDING, cursorY, panelW - PADDING * 2, theme);
+            TooltipPainter.drawSeparator(context, panelX + padding(), cursorY, panelW - padding() * 2, theme);
             cursorY += separatorH;
         }
 
@@ -430,21 +469,21 @@ public class TooltipRenderer {
                 context.drawText(tr,
                         Text.literal(line).setStyle(Style.EMPTY.withColor(
                                 TextColor.fromRgb(theme.body() & 0x00FFFFFF))),
-                        panelX + PADDING, cursorY, theme.body(), true);
+                        panelX + padding(), cursorY, theme.body(), true);
                 cursorY += lineHeight;
             }
         }
 
         // ---- Extra lines (enchantments, durability, etc.) ----
         if (hasExtra && drawStats) {
-            TooltipPainter.drawSeparator(context, panelX + PADDING, cursorY, panelW - PADDING * 2, theme);
+            TooltipPainter.drawSeparator(context, panelX + padding(), cursorY, panelW - padding() * 2, theme);
             cursorY += separatorH;
             int extraColor = TooltipPainter.lerpColor(theme.body(), 0xFFB8C2CF, 0.30f);
             for (String line : wrappedExtra) {
                 context.drawText(tr,
                         Text.literal(line).setStyle(Style.EMPTY.withColor(
                                 TextColor.fromRgb(extraColor & 0x00FFFFFF))),
-                        panelX + PADDING, cursorY, extraColor, true);
+                        panelX + padding(), cursorY, extraColor, true);
                 cursorY += lineHeight;
             }
         }
@@ -464,6 +503,9 @@ public class TooltipRenderer {
         } else {
             TooltipPainter.drawFooterDots(context, panelX + panelW / 2, panelY + panelH - 8, theme);
         }
+
+        // Record whether this frame had an active scroll region (used by MOUSE_SCROLLED to consume the event).
+        ScrollState.setScrollableActive(scrollActive);
 
         context.getMatrices().pop();
     }

@@ -17,9 +17,16 @@ public class ScrollState {
 
     private static final double SCROLL_SPEED = 8.0;
 
-    private static int      offsetPx          = 0;
-    private static double   pendingScrollDelta = 0.0;
-    private static Identifier lastItemKey     = null;
+    private static int        offsetPx          = 0;
+    private static double     pendingScrollDelta = 0.0;
+    private static Identifier lastItemKey        = null;
+
+    /**
+     * Set to {@code true} by {@link net.sweenus.simplytooltips.client.render.TooltipRenderer}
+     * at the end of each render if the scroll region was active that frame.
+     * Used by the mouse-scroll event handler to decide whether to consume the event.
+     */
+    private static boolean scrollableActive = false;
 
     /**
      * Must be called at the start of each tooltip render.
@@ -64,6 +71,22 @@ public class ScrollState {
     public static void reset() {
         offsetPx          = 0;
         pendingScrollDelta = 0.0;
+    }
+
+    /**
+     * Records whether the most recently rendered tooltip had an active scroll region.
+     * Called by {@link net.sweenus.simplytooltips.client.render.TooltipRenderer} at the end of each render.
+     */
+    public static void setScrollableActive(boolean active) {
+        scrollableActive = active;
+    }
+
+    /**
+     * Returns {@code true} if the previous rendered frame had an active scroll region.
+     * Used by the mouse-scroll event handler to decide whether to consume the event.
+     */
+    public static boolean isScrollableActive() {
+        return scrollableActive;
     }
 
     private ScrollState() {}

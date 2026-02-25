@@ -3,6 +3,7 @@ package net.sweenus.simplytooltips.client.render;
 import net.minecraft.item.ItemStack;
 import net.minecraft.registry.Registries;
 import net.minecraft.util.Identifier;
+import net.sweenus.simplytooltips.config.SimplyTooltipsConfig;
 
 /**
  * Tracks per-tooltip animation state (key, start time, last-frame time).
@@ -10,12 +11,14 @@ import net.minecraft.util.Identifier;
  */
 public class TooltipAnimator {
 
-    /** Milliseconds of no-tooltip before animation resets. */
-    public static final long RESET_GAP_MS = 180L;
-
     private static String lastAnimKey         = "";
     private static long   animStartMs         = 0L;
     private static long   animLastFrameMs     = 0L;
+
+    /** Milliseconds of no-tooltip before animation resets (read live from config). */
+    private static long resetGapMs() {
+        return SimplyTooltipsConfig.INSTANCE.animation.animationResetDelayMs.get();
+    }
 
     /**
      * Updates animation state for the current frame and returns elapsed milliseconds
@@ -32,7 +35,7 @@ public class TooltipAnimator {
         if (animKeySuffix != null && !animKeySuffix.isEmpty()) key += animKeySuffix;
 
         boolean keyChanged = !key.equals(lastAnimKey);
-        boolean timedOut   = (now - animLastFrameMs) > RESET_GAP_MS;
+        boolean timedOut   = (now - animLastFrameMs) > resetGapMs();
         if (keyChanged || timedOut) {
             animStartMs   = now;
             lastAnimKey   = key;
