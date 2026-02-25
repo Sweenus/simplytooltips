@@ -1,6 +1,6 @@
 {
   "items": {
-    "minecraft:iron_sword":     { "theme": "ember",     "badges": ["SWORD", "IRON"] },
+    "minecraft:iron_sword":     { "theme": "autumn",     "badges": ["SWORD", "IRON"] },
     "minecraft:enchanted_book": { "theme": "enchanted", "badges": ["ENCHANT"]       }
   },
   "tags": [

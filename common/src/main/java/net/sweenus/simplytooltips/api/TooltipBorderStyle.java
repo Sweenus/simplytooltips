@@ -12,6 +12,7 @@ public final class TooltipBorderStyle {
     public static final int LIGHTNING = 8;
     public static final int EMBER   = 9;
     public static final int ENCHANTED = 10;
+    public static final int AUTUMN = 11;
 
     private TooltipBorderStyle() {}
 }

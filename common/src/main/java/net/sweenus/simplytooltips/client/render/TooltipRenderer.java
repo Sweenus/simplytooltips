@@ -483,6 +483,7 @@ public class TooltipRenderer {
             case TooltipBorderStyle.LIGHTNING -> "lightning";
             case TooltipBorderStyle.EMBER     -> "ember";
             case TooltipBorderStyle.ENCHANTED -> "enchanted";
+            case TooltipBorderStyle.AUTUMN    -> "autumn";
             default -> null;
         };
     }
@@ -501,6 +502,7 @@ public class TooltipRenderer {
             case "lightning" -> TooltipBorderStyle.LIGHTNING;
             case "ember"     -> TooltipBorderStyle.EMBER;
             case "enchanted" -> TooltipBorderStyle.ENCHANTED;
+            case "autumn"    -> TooltipBorderStyle.AUTUMN;
             default          -> TooltipBorderStyle.DEFAULT;
         };
     }
