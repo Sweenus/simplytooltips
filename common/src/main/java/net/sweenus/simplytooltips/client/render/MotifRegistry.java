@@ -17,6 +17,7 @@ public class MotifRegistry {
     static {
         MOTIFS.put("vine",      new VineMotif());
         MOTIFS.put("ember",     new EmberMotif());
+        MOTIFS.put("enchanted", new EnchantedMotif());
         MOTIFS.put("bee",       new BeeMotif());
         MOTIFS.put("blossom",   new BlossomMotif());
         MOTIFS.put("bubble",    new BubbleMotif());

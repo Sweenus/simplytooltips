@@ -41,6 +41,9 @@ public record ThemeDefinition(
          *   <li>{@code "shimmer"} — brightness glint sweeps across letters
          *   <li>{@code "pulse"}   — whole title brightens and dims on a slow cycle
          *   <li>{@code "flicker"} — subtle irregular fire-light brightness variation
+         *   <li>{@code "shiver"}  — per-letter jitter / shivering effect
+         *   <li>{@code "quiver"}  — very subtle slow micro-jitter (legacy subtle shiver look)
+         *   <li>{@code "breathe_spin_bob"} — combined scale pulse + gentle tilt + vertical bob
          *   <li>{@code "static"}  — no animation, plain text
          * </ul>
          */

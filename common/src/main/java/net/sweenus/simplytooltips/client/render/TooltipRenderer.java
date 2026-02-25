@@ -221,6 +221,9 @@ public class TooltipRenderer {
             case "shimmer" -> TooltipPainter.drawShimmerText(context, tr, model.title(), nameX, nameY, theme.name(), iconTimeMs);
             case "pulse"   -> TooltipPainter.drawPulseText(context, tr, model.title(), nameX, nameY, theme.name(), iconTimeMs);
             case "flicker" -> TooltipPainter.drawFlickerText(context, tr, model.title(), nameX, nameY, theme.name(), iconTimeMs);
+            case "shiver", "shivering" -> TooltipPainter.drawShiverText(context, tr, model.title(), nameX, nameY, theme.name(), iconTimeMs);
+            case "quiver"  -> TooltipPainter.drawQuiverText(context, tr, model.title(), nameX, nameY, theme.name(), iconTimeMs);
+            case "breathe_spin_bob" -> TooltipPainter.drawBreatheSpinBobText(context, tr, model.title(), nameX, nameY, theme.name(), iconTimeMs);
             case "static"  -> context.drawText(tr, Text.literal(model.title()).setStyle(
                                   Style.EMPTY.withColor(TextColor.fromRgb(theme.name() & 0x00FFFFFF))),
                                   nameX, nameY, theme.name(), true);
@@ -416,6 +419,7 @@ public class TooltipRenderer {
             case TooltipBorderStyle.ICE       -> "ice";
             case TooltipBorderStyle.LIGHTNING -> "lightning";
             case TooltipBorderStyle.EMBER     -> "ember";
+            case TooltipBorderStyle.ENCHANTED -> "enchanted";
             default -> null;
         };
     }
@@ -433,6 +437,7 @@ public class TooltipRenderer {
             case "ice"       -> TooltipBorderStyle.ICE;
             case "lightning" -> TooltipBorderStyle.LIGHTNING;
             case "ember"     -> TooltipBorderStyle.EMBER;
+            case "enchanted" -> TooltipBorderStyle.ENCHANTED;
             default          -> TooltipBorderStyle.DEFAULT;
         };
     }

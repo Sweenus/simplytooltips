@@ -214,6 +214,37 @@ public class BorderRenderer {
                 context.fill(x + 3, y + h - 4, x + 5, y + h - 3, hot);
                 context.fill(x + w - 5, y + h - 4, x + w - 3, y + h - 3, hot);
             }
+            case TooltipBorderStyle.ENCHANTED -> {
+                int runeA  = 0xFFD4B7FF;
+                int runeB  = 0xFF9D73E8;
+                int sigil  = 0xFF6D4AC7;
+                int spark  = 0xFFE8DBFF;
+
+                for (int px = x + 10, i = 0; px < x + w - 10; px += 14, i++) {
+                    if ((i & 1) == 0) {
+                        context.fill(px, y + 1, px + 1, y + 4, runeA);
+                        context.fill(px + 1, y + 2, px + 3, y + 3, runeB);
+                        context.fill(px + 1, y + 1, px + 2, y + 2, spark);
+
+                        context.fill(px, y + h - 4, px + 1, y + h - 1, runeA);
+                        context.fill(px - 1, y + h - 3, px + 1, y + h - 2, runeB);
+                        context.fill(px, y + h - 2, px + 1, y + h - 1, spark);
+                    } else {
+                        context.fill(px, y + 2, px + 3, y + 3, runeA);
+                        context.fill(px + 1, y + 1, px + 2, y + 4, runeB);
+                        context.fill(px + 1, y + 2, px + 2, y + 3, sigil);
+
+                        context.fill(px, y + h - 3, px + 3, y + h - 2, runeA);
+                        context.fill(px + 1, y + h - 4, px + 2, y + h - 1, runeB);
+                        context.fill(px + 1, y + h - 3, px + 2, y + h - 2, sigil);
+                    }
+                }
+
+                context.fill(x + 3, y + 3, x + 5, y + 5, spark);
+                context.fill(x + w - 5, y + 3, x + w - 3, y + 5, spark);
+                context.fill(x + 3, y + h - 5, x + 5, y + h - 3, spark);
+                context.fill(x + w - 5, y + h - 5, x + w - 3, y + h - 3, spark);
+            }
             default -> {}
         }
     }

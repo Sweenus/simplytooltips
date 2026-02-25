@@ -5,6 +5,7 @@ import net.minecraft.client.gui.DrawContext;
 import net.minecraft.text.Style;
 import net.minecraft.text.Text;
 import net.minecraft.text.TextColor;
+import net.minecraft.util.math.RotationAxis;
 import net.sweenus.simplytooltips.api.TooltipTheme;
 
 import java.util.ArrayList;
@@ -324,6 +325,86 @@ public class TooltipPainter {
         context.drawText(tr,
                 Text.literal(text).setStyle(Style.EMPTY.withColor(TextColor.fromRgb(c & 0x00FFFFFF))),
                 x, y, c, true);
+    }
+
+    /**
+     * Draws {@code text} with a subtle per-letter jitter to simulate shivering.
+     * Offsets are deterministic (sin/cos based), so there is no frame-to-frame random flicker.
+     */
+    public static void drawShiverText(DrawContext context, TextRenderer tr, String text,
+                                      int x, int y, int color, long timeMs) {
+        if (text == null || text.isEmpty()) return;
+
+        int cursorX = x;
+        for (int i = 0; i < text.length(); i++) {
+            String ch = String.valueOf(text.charAt(i));
+            int charW = tr.getWidth(ch);
+
+            // Horizontal-biased shiver: side-to-side motion with minimal vertical movement.
+            double t = timeMs * 0.016 + i * 1.11;
+            int xOffset = (int) Math.round(Math.sin(t) * 0.58 + Math.cos(t * 1.31) * 0.22);
+            int yOffset = (int) Math.round(Math.cos(t * 0.72) * 0.10);
+
+            context.drawText(tr,
+                    Text.literal(ch).setStyle(Style.EMPTY.withColor(TextColor.fromRgb(color & 0x00FFFFFF))),
+                    cursorX + xOffset, y + yOffset, color, true);
+
+            cursorX += charW;
+        }
+    }
+
+    /**
+     * Draws {@code text} with a very subtle, slow all-direction micro-jitter.
+     * Intended as a softer alternative to {@link #drawShiverText}.
+     */
+    public static void drawQuiverText(DrawContext context, TextRenderer tr, String text,
+                                      int x, int y, int color, long timeMs) {
+        if (text == null || text.isEmpty()) return;
+
+        int cursorX = x;
+        for (int i = 0; i < text.length(); i++) {
+            String ch = String.valueOf(text.charAt(i));
+            int charW = tr.getWidth(ch);
+
+            double t = timeMs * 0.010 + i * 1.37;
+            int xOffset = (int) Math.round(Math.sin(t) * 0.45);
+            int yOffset = (int) Math.round(Math.cos(t * 0.87) * 0.55);
+
+            context.drawText(tr,
+                    Text.literal(ch).setStyle(Style.EMPTY.withColor(TextColor.fromRgb(color & 0x00FFFFFF))),
+                    cursorX + xOffset, y + yOffset, color, true);
+
+            cursorX += charW;
+        }
+    }
+
+    /**
+     * Draws {@code text} with a combined breathe + spin + bob transform,
+     * mirroring the {@code "breathe_spin_bob"} item animation feel.
+     */
+    public static void drawBreatheSpinBobText(DrawContext context, TextRenderer tr, String text,
+                                              int x, int y, int color, long timeMs) {
+        if (text == null || text.isEmpty()) return;
+
+        int textW = tr.getWidth(text);
+        float centerX = x + (textW / 2.0F);
+        float centerY = y + (tr.fontHeight / 2.0F);
+
+        float breatheScale = 1.0F + (float) Math.sin(timeMs * 0.0042) * 0.040F;
+        float spinDegrees  = (float) Math.sin(timeMs * 0.0018) * 2.2F;
+        float bobOffset    = (float) Math.sin(timeMs * 0.0026 + 1.1) * 0.9F;
+
+        context.getMatrices().push();
+        context.getMatrices().translate(centerX, centerY + bobOffset, 0.0F);
+        context.getMatrices().multiply(RotationAxis.POSITIVE_Z.rotationDegrees(spinDegrees));
+        context.getMatrices().scale(breatheScale, breatheScale, 1.0F);
+        context.getMatrices().translate(-centerX, -centerY, 0.0F);
+
+        context.drawText(tr,
+                Text.literal(text).setStyle(Style.EMPTY.withColor(TextColor.fromRgb(color & 0x00FFFFFF))),
+                x, y, color, true);
+
+        context.getMatrices().pop();
     }
 
     // --- Colour helpers ---

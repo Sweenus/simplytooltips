@@ -1,7 +1,7 @@
 {
   "items": {
-    "minecraft:iron_sword": { "theme": "ember", "badges": ["SWORD", "IRON"] },
-    "simplybows:iron_sword": { "theme": "ember", "badges": ["SWORD", "IRON"] }
+    "minecraft:iron_sword":     { "theme": "ember",     "badges": ["SWORD", "IRON"] },
+    "minecraft:enchanted_book": { "theme": "enchanted", "badges": ["ENCHANT"]       }
   },
   "tags": [
     { "tag": "minecraft:swords",    "badges": ["SWORD"]   },
