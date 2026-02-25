@@ -10,6 +10,7 @@ public final class TooltipBorderStyle {
     public static final int ECHO    = 6;
     public static final int ICE     = 7;
     public static final int LIGHTNING = 8;
+    public static final int EMBER   = 9;
 
     private TooltipBorderStyle() {}
 }

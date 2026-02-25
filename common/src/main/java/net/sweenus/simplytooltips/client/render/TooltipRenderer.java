@@ -50,11 +50,14 @@ public class TooltipRenderer {
         ModernTooltipModel model = provider.build(stack, rawLines, altDown);
 
         // Resolve theme via priority chain: provider key > item/tag data > rarity
-        ThemeDefinition resolvedDef  = resolveTheme(stack, model);
-        final TooltipTheme theme     = resolvedDef.colors();
-        final String       motifStr  = resolvedDef.motif();
-        final int          borderStyle      = borderStyleFor(motifStr);
-        final String       resolvedMotifKey = "none".equals(motifStr) ? null : motifStr;
+        ThemeDefinition resolvedDef      = resolveTheme(stack, model);
+        final TooltipTheme theme         = resolvedDef.colors();
+        final String       motifStr      = resolvedDef.motif();
+        final int          borderStyle   = borderStyleFor(motifStr);
+        final String resolvedMotifKey    = "none".equals(motifStr) ? null : motifStr;
+        final String itemAnimStyle       = resolvedDef.itemAnimStyle();
+        final String titleAnimStyle      = resolvedDef.titleAnimStyle();
+        final String itemBorderShape     = resolvedDef.itemBorderShape();
 
         // Data-driven badge override: item_themes JSON can replace the provider's default badges
         List<String> dataBadges = ItemThemeRegistry.resolveBadgesForStack(stack);
@@ -165,12 +168,41 @@ public class TooltipRenderer {
         // ---- Header: item icon ----
         int iconFrameX = panelX + PADDING + 2;
         int iconFrameY = cursorY + 2;
-        TooltipPainter.drawDiamondFrame(context, iconFrameX, iconFrameY, 24, theme);
+        TooltipPainter.drawItemFrame(context, iconFrameX, iconFrameY, 24, theme, itemBorderShape);
 
-        long  iconTimeMs    = System.currentTimeMillis();
-        float breatheScale  = 1.0F + (float) Math.sin(iconTimeMs * 0.0042) * 0.055F;
-        float spinDegrees   = (float) Math.sin(iconTimeMs * 0.0018) * 4.0F;
-        float bobOffset     = (float) Math.sin(iconTimeMs * 0.0026 + 1.1) * 0.7F;
+        long  iconTimeMs = System.currentTimeMillis();
+        float breatheScale, spinDegrees, bobOffset;
+        switch (itemAnimStyle != null ? itemAnimStyle : "breathe_spin_bob") {
+            case "spin" -> {
+                // Slow continuous rotation, no scale or bob
+                breatheScale = 1.0F;
+                spinDegrees  = (float)(iconTimeMs % 9000L) / 9000.0F * 360.0F;
+                bobOffset    = 0.0F;
+            }
+            case "bob" -> {
+                // Vertical bob only
+                breatheScale = 1.0F;
+                spinDegrees  = 0.0F;
+                bobOffset    = (float) Math.sin(iconTimeMs * 0.0026) * 1.8F;
+            }
+            case "breathe" -> {
+                // Scale pulse only
+                breatheScale = 1.0F + (float) Math.sin(iconTimeMs * 0.0042) * 0.12F;
+                spinDegrees  = 0.0F;
+                bobOffset    = 0.0F;
+            }
+            case "static" -> {
+                breatheScale = 1.0F;
+                spinDegrees  = 0.0F;
+                bobOffset    = 0.0F;
+            }
+            default -> {
+                // "breathe_spin_bob" — all three combined
+                breatheScale = 1.0F + (float) Math.sin(iconTimeMs * 0.0042) * 0.055F;
+                spinDegrees  = (float) Math.sin(iconTimeMs * 0.0018) * 4.0F;
+                bobOffset    = (float) Math.sin(iconTimeMs * 0.0026 + 1.1) * 0.7F;
+            }
+        }
 
         context.getMatrices().push();
         float itemCenterX = iconFrameX + 12.0F;
@@ -185,7 +217,15 @@ public class TooltipRenderer {
         // ---- Header: title + badges ----
         int nameX = panelX + PADDING + iconAreaW;
         int nameY = cursorY + 4;
-        TooltipPainter.drawWaveText(context, tr, model.title(), nameX, nameY, theme.name(), iconTimeMs);
+        switch (titleAnimStyle != null ? titleAnimStyle : "wave") {
+            case "shimmer" -> TooltipPainter.drawShimmerText(context, tr, model.title(), nameX, nameY, theme.name(), iconTimeMs);
+            case "pulse"   -> TooltipPainter.drawPulseText(context, tr, model.title(), nameX, nameY, theme.name(), iconTimeMs);
+            case "flicker" -> TooltipPainter.drawFlickerText(context, tr, model.title(), nameX, nameY, theme.name(), iconTimeMs);
+            case "static"  -> context.drawText(tr, Text.literal(model.title()).setStyle(
+                                  Style.EMPTY.withColor(TextColor.fromRgb(theme.name() & 0x00FFFFFF))),
+                                  nameX, nameY, theme.name(), true);
+            default        -> TooltipPainter.drawWaveText(context, tr, model.title(), nameX, nameY, theme.name(), iconTimeMs);
+        }
 
         int badgeY = cursorY + 4 + tr.fontHeight + 3;
         if (badges != null && !badges.isEmpty()) {
@@ -375,6 +415,7 @@ public class TooltipRenderer {
             case TooltipBorderStyle.ECHO      -> "echo";
             case TooltipBorderStyle.ICE       -> "ice";
             case TooltipBorderStyle.LIGHTNING -> "lightning";
+            case TooltipBorderStyle.EMBER     -> "ember";
             default -> null;
         };
     }
@@ -391,6 +432,7 @@ public class TooltipRenderer {
             case "echo"      -> TooltipBorderStyle.ECHO;
             case "ice"       -> TooltipBorderStyle.ICE;
             case "lightning" -> TooltipBorderStyle.LIGHTNING;
+            case "ember"     -> TooltipBorderStyle.EMBER;
             default          -> TooltipBorderStyle.DEFAULT;
         };
     }

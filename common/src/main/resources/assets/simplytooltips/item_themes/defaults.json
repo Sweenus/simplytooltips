@@ -1,13 +1,35 @@
 {
   "items": {
-    "minecraft:iron_sword": { "theme": "lightning", "badges": ["SWORD", "IRON"] }
+    "minecraft:iron_sword": { "theme": "ember", "badges": ["SWORD", "IRON"] },
+    "simplybows:iron_sword": { "theme": "ember", "badges": ["SWORD", "IRON"] }
   },
   "tags": [
-    { "tag": "minecraft:swords",   "theme": "lightning", "badges": ["SWORD"]   },
-    { "tag": "minecraft:axes",     "theme": "earth",     "badges": ["AXE"]     },
-    { "tag": "minecraft:pickaxes", "theme": "earth",     "badges": ["PICKAXE"] },
-    { "tag": "minecraft:shovels",  "theme": "earth",     "badges": ["SHOVEL"]  },
-    { "tag": "minecraft:hoes",     "theme": "vine",      "badges": ["HOE"]     },
-    { "tag": "minecraft:tridents", "theme": "bubble",    "badges": ["TRIDENT"] }
+    { "tag": "minecraft:swords",    "badges": ["SWORD"]   },
+    { "tag": "minecraft:axes",      "badges": ["AXE"]     },
+    { "tag": "minecraft:pickaxes",  "badges": ["PICKAXE"] },
+    { "tag": "minecraft:shovels",   "badges": ["SHOVEL"]  },
+    { "tag": "minecraft:arrows",    "badges": ["ARROW"]   },
+    { "tag": "minecraft:hoes",      "theme": "vine",      "badges": ["HOE"]     },
+    { "tag": "minecraft:tridents",  "theme": "bubble",    "badges": ["TRIDENT"] },
+
+    { "tag": "c:arrows",              "badges": ["ARROW"]   },
+    { "tag": "c:armors",              "badges": ["ARMOR"]   },
+    { "tag": "c:dyes",                "badges": ["DYE"]     },
+    { "tag": "c:foods",               "badges": ["FOOD"]    },
+    { "tag": "c:ingots",              "badges": ["INGOT"]   },
+    { "tag": "c:nuggets",             "badges": ["NUGGET"]  },
+    { "tag": "c:music_discs",         "badges": ["MUSIC"]   },
+    { "tag": "c:ores",                "badges": ["ORE"]     },
+    { "tag": "c:potions",             "badges": ["POTION"]  },
+    { "tag": "c:seeds",               "badges": ["SEED"]    },
+    { "tag": "c:storage_blocks",      "badges": ["STORAGE"] },
+    { "tag": "c:tools",               "badges": ["TOOL"]    },
+    { "tag": "c:tools/ranged_weapon", "badges": ["RANGED"]  },
+    { "tag": "c:tools/melee_weapon",  "badges": ["MELEE"]   },
+
+    { "tag": "simplyswords:uniques",      "badges": ["UNIQUE"]  },
+    { "tag": "simplyswords:runic_gear",   "badges": ["RUNIC"]   },
+    { "tag": "simplyswords:gems",         "badges": ["UPGRADE"] },
+    { "tag": "simplybows:upgrades",       "badges": ["UPGRADE"] }
   ]
 }

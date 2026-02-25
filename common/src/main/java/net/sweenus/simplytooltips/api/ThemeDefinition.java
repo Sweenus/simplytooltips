@@ -24,19 +24,37 @@ public record ThemeDefinition(
 
         /**
          * Animation style for the item icon in the header.
-         * Recognised values: {@code "breathe_spin_bob"}, {@code "static"}.
+         * <ul>
+         *   <li>{@code "breathe_spin_bob"} — scale pulse + pendulum spin + vertical bob (default)
+         *   <li>{@code "spin"}    — slow continuous rotation only
+         *   <li>{@code "bob"}     — gentle vertical bob only
+         *   <li>{@code "breathe"} — scale pulse only
+         *   <li>{@code "static"}  — no animation
+         * </ul>
          */
         String itemAnimStyle,
 
         /**
          * Animation style for the title text.
-         * Recognised values: {@code "wave"}, {@code "static"}.
+         * <ul>
+         *   <li>{@code "wave"}    — travelling vertical wave (default)
+         *   <li>{@code "shimmer"} — brightness glint sweeps across letters
+         *   <li>{@code "pulse"}   — whole title brightens and dims on a slow cycle
+         *   <li>{@code "flicker"} — subtle irregular fire-light brightness variation
+         *   <li>{@code "static"}  — no animation, plain text
+         * </ul>
          */
         String titleAnimStyle,
 
         /**
-         * Shape of the frame around the item icon.
-         * Currently only {@code "diamond"} is rendered; reserved for future expansion.
+         * Shape of the frame drawn around the item icon.
+         * <ul>
+         *   <li>{@code "diamond"} — rotated diamond (default)
+         *   <li>{@code "square"}  — beveled square
+         *   <li>{@code "circle"}  — pixel circle
+         *   <li>{@code "cross"}   — plus / cross shape
+         *   <li>{@code "none"}    — no frame
+         * </ul>
          */
         String itemBorderShape,
 
