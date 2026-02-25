@@ -1,0 +1,13 @@
+{
+  "items": {
+    "minecraft:iron_sword": { "theme": "lightning", "badges": ["SWORD", "IRON"] }
+  },
+  "tags": [
+    { "tag": "minecraft:swords",   "theme": "lightning", "badges": ["SWORD"]   },
+    { "tag": "minecraft:axes",     "theme": "earth",     "badges": ["AXE"]     },
+    { "tag": "minecraft:pickaxes", "theme": "earth",     "badges": ["PICKAXE"] },
+    { "tag": "minecraft:shovels",  "theme": "earth",     "badges": ["SHOVEL"]  },
+    { "tag": "minecraft:hoes",     "theme": "vine",      "badges": ["HOE"]     },
+    { "tag": "minecraft:tridents", "theme": "bubble",    "badges": ["TRIDENT"] }
+  ]
+}

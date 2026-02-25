@@ -7,6 +7,7 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.text.Style;
 import net.minecraft.text.Text;
 import net.minecraft.text.TextColor;
+import net.minecraft.util.Rarity;
 import net.minecraft.util.math.RotationAxis;
 import net.sweenus.simplytooltips.api.*;
 import net.sweenus.simplytooltips.client.render.motif.BackgroundMotif;
@@ -48,23 +49,16 @@ public class TooltipRenderer {
 
         ModernTooltipModel model = provider.build(stack, rawLines, altDown);
 
-        // Resolve theme + motif: themeKey overrides the model's inline theme/borderStyle
-        final TooltipTheme theme;
-        final int          borderStyle;
-        final String       resolvedMotifKey;
-        if (model.themeKey() != null) {
-            ThemeDefinition def = ThemeRegistry.get(model.themeKey());
-            theme            = def.colors();
-            String motif     = def.motif();
-            borderStyle      = borderStyleFor(motif);
-            resolvedMotifKey = "none".equals(motif) ? null : motif;
-        } else {
-            theme            = model.theme();
-            borderStyle      = model.borderStyle();
-            resolvedMotifKey = motifKeyFor(borderStyle);
-        }
+        // Resolve theme via priority chain: provider key > item/tag data > rarity
+        ThemeDefinition resolvedDef  = resolveTheme(stack, model);
+        final TooltipTheme theme     = resolvedDef.colors();
+        final String       motifStr  = resolvedDef.motif();
+        final int          borderStyle      = borderStyleFor(motifStr);
+        final String       resolvedMotifKey = "none".equals(motifStr) ? null : motifStr;
 
-        List<String> badges = model.badges();
+        // Data-driven badge override: item_themes JSON can replace the provider's default badges
+        List<String> dataBadges = ItemThemeRegistry.resolveBadgesForStack(stack);
+        List<String> badges = dataBadges != null ? dataBadges : model.badges();
 
         long tooltipElapsedMs = TooltipAnimator.updateAndGetElapsed(stack, model.animKeyExtra());
 
@@ -398,6 +392,40 @@ public class TooltipRenderer {
             case "ice"       -> TooltipBorderStyle.ICE;
             case "lightning" -> TooltipBorderStyle.LIGHTNING;
             default          -> TooltipBorderStyle.DEFAULT;
+        };
+    }
+
+    /**
+     * Resolves the {@link ThemeDefinition} to use for this tooltip using the 4-level priority chain:
+     * <ol>
+     *   <li>Provider-supplied {@code model.themeKey()} (e.g. Simply Bows bow themes)</li>
+     *   <li>Per-item or per-tag mapping from {@link ItemThemeRegistry}</li>
+     *   <li>Vanilla item rarity (common / uncommon / rare / epic)</li>
+     *   <li>Registry default (golden fallback if a rarity key is somehow missing)</li>
+     * </ol>
+     */
+    private static ThemeDefinition resolveTheme(ItemStack stack, ModernTooltipModel model) {
+        // 1. Provider-supplied override
+        if (model.themeKey() != null)
+            return ThemeRegistry.get(model.themeKey());
+
+        // 2. Data-driven item / tag mapping
+        String dataKey = ItemThemeRegistry.resolveForStack(stack);
+        if (dataKey != null)
+            return ThemeRegistry.get(dataKey);
+
+        // 3. Rarity fallback
+        Rarity rarity = stack.getRarity();
+        return ThemeRegistry.get(rarityThemeKey(rarity != null ? rarity : Rarity.COMMON));
+    }
+
+    /** Maps a vanilla {@link Rarity} to the corresponding rarity theme key. */
+    private static String rarityThemeKey(Rarity rarity) {
+        return switch (rarity) {
+            case UNCOMMON -> "rarity_uncommon";
+            case RARE     -> "rarity_rare";
+            case EPIC     -> "rarity_epic";
+            default       -> "rarity_common";
         };
     }
 

@@ -1,7 +1,6 @@
 package net.sweenus.simplytooltips.client.tooltip;
 
 import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
 import net.minecraft.text.Text;
 import net.sweenus.simplytooltips.api.ModernTooltipModel;
 import net.sweenus.simplytooltips.api.TooltipBorderStyle;
@@ -26,12 +25,6 @@ public final class GenericTooltipProvider implements TooltipProvider {
 
         List<String> bodyLines = new ArrayList<>();
         List<Text> extraLines = new ArrayList<>();
-
-        String themeKey = "default";
-
-        if (stack.isOf(Items.IRON_SWORD)) {
-            themeKey = "lightning";
-        }
 
         // Lines before the first blank line → body; lines after → extras (enchantments etc.)
         boolean pastBlank = false;
@@ -58,7 +51,7 @@ public final class GenericTooltipProvider implements TooltipProvider {
                 TooltipTheme.defaultTheme(),
                 null,
                 null,
-                themeKey
+                null  // themeKey=null: TooltipRenderer handles item/tag/rarity resolution
         );
     }
 }
