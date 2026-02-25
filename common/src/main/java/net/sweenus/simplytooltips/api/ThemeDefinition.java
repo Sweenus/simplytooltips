@@ -46,6 +46,7 @@ public record ThemeDefinition(
          *   <li>{@code "breathe_spin_bob"} — combined scale pulse + gentle tilt + vertical bob
          *   <li>{@code "drop_bounce"} — letters drop from above, bounce once, then stay static
          *   <li>{@code "hinge_fall"} — one random letter loosens, swings, and falls away permanently per tooltip open
+         *   <li>{@code "obfuscate"} — random letters intermittently switch to obfuscated glyphs and back
          *   <li>{@code "static"}  — no animation, plain text
          * </ul>
          */

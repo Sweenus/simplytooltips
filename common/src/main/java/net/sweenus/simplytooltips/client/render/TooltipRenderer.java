@@ -258,7 +258,13 @@ public class TooltipRenderer {
             case "quiver"  -> TooltipPainter.drawQuiverText(context, tr, model.title(), nameX, nameY, theme.name(), iconTimeMs);
             case "breathe_spin_bob" -> TooltipPainter.drawBreatheSpinBobText(context, tr, model.title(), nameX, nameY, theme.name(), iconTimeMs);
             case "drop_bounce" -> TooltipPainter.drawDropBounceText(context, tr, model.title(), nameX, nameY, theme.name(), tooltipElapsedMs);
-            case "hinge_fall" -> TooltipPainter.drawHingeFallText(context, tr, model.title(), nameX, nameY, theme.name(), tooltipElapsedMs);
+            case "hinge_fall" -> {
+                // Clip title animation to tooltip bounds so off-panel motion stays hidden.
+                context.enableScissor(panelX + 1, panelY + 1, panelX + panelW - 1, panelY + panelH - 1);
+                TooltipPainter.drawHingeFallText(context, tr, model.title(), nameX, nameY, theme.name(), tooltipElapsedMs);
+                context.disableScissor();
+            }
+            case "obfuscate" -> TooltipPainter.drawObfuscateText(context, tr, model.title(), nameX, nameY, theme.name(), tooltipElapsedMs);
             case "static"  -> context.drawText(tr, Text.literal(model.title()).setStyle(
                                   Style.EMPTY.withColor(TextColor.fromRgb(theme.name() & 0x00FFFFFF))),
                                   nameX, nameY, theme.name(), true);

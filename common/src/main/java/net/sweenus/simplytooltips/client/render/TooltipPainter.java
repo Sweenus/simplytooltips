@@ -27,6 +27,12 @@ public class TooltipPainter {
     private static float  hingeDrift         = 0.0F;
     private static String hingeLastText      = "";
 
+    // State for one-shot-per-tooltip random obfuscation toggles.
+    private static long      obfLastElapsedMs = -1L;
+    private static String    obfLastText      = "";
+    private static long[]    obfNextToggleMs  = new long[0];
+    private static boolean[] obfActive        = new boolean[0];
+
     // --- Background ---
 
     /** Fills the tooltip panel with a vertical gradient from {@code theme.bgTop()} to {@code theme.bgBottom()}. */
@@ -692,6 +698,56 @@ public class TooltipPainter {
             // After fall phase: do not draw this character anymore in current tooltip session.
 
             cursorX += charW;
+        }
+    }
+
+    /**
+     * Draws text where individual characters randomly toggle between normal and
+     * obfuscated rendering on irregular intervals.
+     *
+     * <p>Uses tooltip elapsed time so state resets when tooltip is reopened.
+     */
+    public static void drawObfuscateText(DrawContext context, TextRenderer tr, String text,
+                                         int x, int y, int color, long elapsedMs) {
+        if (text == null || text.isEmpty()) return;
+
+        boolean reset = elapsedMs < obfLastElapsedMs
+                || !text.equals(obfLastText)
+                || obfNextToggleMs.length != text.length();
+
+        if (reset) {
+            obfNextToggleMs = new long[text.length()];
+            obfActive = new boolean[text.length()];
+            for (int i = 0; i < text.length(); i++) {
+                obfActive[i] = false;
+                obfNextToggleMs[i] = ThreadLocalRandom.current().nextLong(180L, 820L);
+            }
+            obfLastText = text;
+        }
+        obfLastElapsedMs = elapsedMs;
+
+        int cursorX = x;
+        for (int i = 0; i < text.length(); i++) {
+            char raw = text.charAt(i);
+            String ch = String.valueOf(raw);
+
+            if (!Character.isWhitespace(raw)) {
+                while (elapsedMs >= obfNextToggleMs[i]) {
+                    obfActive[i] = !obfActive[i];
+                    long nextDelta = obfActive[i]
+                            ? ThreadLocalRandom.current().nextLong(130L, 340L)
+                            : ThreadLocalRandom.current().nextLong(260L, 900L);
+                    obfNextToggleMs[i] += nextDelta;
+                }
+            } else {
+                obfActive[i] = false;
+            }
+
+            Style style = Style.EMPTY
+                    .withColor(TextColor.fromRgb(color & 0x00FFFFFF))
+                    .withObfuscated(obfActive[i]);
+            context.drawText(tr, Text.literal(ch).setStyle(style), cursorX, y, color, true);
+            cursorX += tr.getWidth(ch);
         }
     }
 
