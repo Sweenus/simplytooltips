@@ -192,6 +192,79 @@ public class TooltipPainter {
         BorderRenderer.drawSmallDiamond(context, cx + 8, y, theme.footerDot());
     }
 
+    // --- Scrollbar ---
+
+    /**
+     * Draws a 2 px wide vertical scrollbar on the inner-right edge of the tooltip panel.
+     *
+     * @param context      draw context
+     * @param trackX       left edge of the 2 px track (typically {@code panelX + panelW - 4})
+     * @param trackY       top of the scrollable viewport
+     * @param trackH       height of the scrollable viewport
+     * @param scrollOffset current scroll offset in pixels (0 = top)
+     * @param scrollMax    maximum scroll offset in pixels
+     * @param theme        active tooltip theme (used for thumb colour)
+     */
+    public static void drawScrollbar(DrawContext context, int trackX, int trackY, int trackH,
+                                     int scrollOffset, int scrollMax, TooltipTheme theme) {
+        if (scrollMax <= 0) return;
+
+        // Track
+        context.fill(trackX, trackY, trackX + 2, trackY + trackH, 0x44000000);
+
+        // Thumb size — proportional to visible ratio, minimum 6 px
+        float visibleRatio = (float) trackH / (float)(trackH + scrollMax);
+        int   thumbH       = Math.max(6, (int)(trackH * visibleRatio));
+
+        // Thumb position along track
+        float thumbT = (float) scrollOffset / (float) scrollMax;
+        int   thumbY = trackY + (int)((trackH - thumbH) * thumbT);
+
+        // Thumb colour — theme border at 0xCC alpha
+        int thumbColor = (theme.border() & 0x00FFFFFF) | 0xCC000000;
+        context.fill(trackX, thumbY, trackX + 2, thumbY + thumbH, thumbColor);
+    }
+
+    // --- Tab dots ---
+
+    /**
+     * Draws one indicator dot per tab, centred at {@code cx}.
+     * Dots are spaced 8 px apart. The active tab's dot is a brightened 5×5 diamond;
+     * inactive tabs use the standard 3×3 footer diamond.
+     *
+     * @param context    draw context
+     * @param cx         horizontal centre of the dot row
+     * @param y          vertical centre of the dot row
+     * @param tabs       ordered list of available tabs
+     * @param activeTab  the currently active tab
+     * @param theme      active tooltip theme
+     */
+    public static void drawTabDots(DrawContext context, int cx, int y,
+                                   List<TabState.Tab> tabs, TabState.Tab activeTab,
+                                   TooltipTheme theme) {
+        int n = tabs.size();
+        if (n == 0) return;
+
+        // Dots are spaced 8 px apart; the row is centred on cx
+        int startCx = cx - (n - 1) * 4;
+
+        for (int i = 0; i < n; i++) {
+            int dotCx = startCx + i * 8;
+            if (tabs.get(i) == activeTab) {
+                // Active: 5×5 diamond, brightened 50% toward white
+                int c = lerpColor(theme.footerDot(), 0xFFFFFFFF, 0.50f);
+                context.fill(dotCx,     y - 2, dotCx + 1, y - 1, c);
+                context.fill(dotCx - 1, y - 1, dotCx + 2, y,     c);
+                context.fill(dotCx - 2, y,     dotCx + 3, y + 1, c);
+                context.fill(dotCx - 1, y + 1, dotCx + 2, y + 2, c);
+                context.fill(dotCx,     y + 2, dotCx + 1, y + 3, c);
+            } else {
+                // Inactive: standard 3×3 footer diamond
+                BorderRenderer.drawSmallDiamond(context, dotCx, y, theme.footerDot());
+            }
+        }
+    }
+
     // --- Badges ---
 
     /**
