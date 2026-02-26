@@ -606,25 +606,31 @@ public class TooltipRenderer {
     }
 
     /**
-     * Resolves the {@link ThemeDefinition} to use for this tooltip using the 4-level priority chain:
+     * Resolves the {@link ThemeDefinition} to use for this tooltip using the priority chain:
      * <ol>
-     *   <li>Provider-supplied {@code model.themeKey()} (e.g. Simply Bows bow themes)</li>
-     *   <li>Per-item or per-tag mapping from {@link ItemThemeRegistry}</li>
+     *   <li>Exact per-item mapping from {@link ItemThemeRegistry} (hard override)</li>
+     *   <li>Provider-supplied {@code model.themeKey()} (e.g. mod-specific defaults)</li>
+     *   <li>Per-tag mapping from {@link ItemThemeRegistry}</li>
      *   <li>Vanilla item rarity (common / uncommon / rare / epic)</li>
      *   <li>Registry default (golden fallback if a rarity key is somehow missing)</li>
      * </ol>
      */
     private static ThemeDefinition resolveTheme(ItemStack stack, ModernTooltipModel model) {
-        // 1. Provider-supplied override
+        // 1. Data-driven exact item mapping (always wins)
+        String itemDataKey = ItemThemeRegistry.resolveItemThemeForStack(stack);
+        if (itemDataKey != null)
+            return ThemeRegistry.get(itemDataKey);
+
+        // 2. Provider-supplied default
         if (model.themeKey() != null)
             return ThemeRegistry.get(model.themeKey());
 
-        // 2. Data-driven item / tag mapping
-        String dataKey = ItemThemeRegistry.resolveForStack(stack);
-        if (dataKey != null)
-            return ThemeRegistry.get(dataKey);
+        // 3. Data-driven tag mapping
+        String tagDataKey = ItemThemeRegistry.resolveTagThemeForStack(stack);
+        if (tagDataKey != null)
+            return ThemeRegistry.get(tagDataKey);
 
-        // 3. Rarity fallback
+        // 4. Rarity fallback
         Rarity rarity = stack.getRarity();
         return ThemeRegistry.get(rarityThemeKey(rarity != null ? rarity : Rarity.COMMON));
     }

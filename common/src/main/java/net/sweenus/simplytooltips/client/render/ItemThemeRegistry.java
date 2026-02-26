@@ -65,12 +65,22 @@ public final class ItemThemeRegistry {
      * <p>Priority: exact item-ID match → first matching tag.
      */
     public static @Nullable String resolveForStack(ItemStack stack) {
+        String itemTheme = resolveItemThemeForStack(stack);
+        if (itemTheme != null) return itemTheme;
+        return resolveTagThemeForStack(stack);
+    }
+
+    /** Returns only an exact item-ID theme match, or {@code null}. */
+    public static @Nullable String resolveItemThemeForStack(ItemStack stack) {
         if (stack == null || stack.isEmpty()) return null;
 
         Identifier id = Registries.ITEM.getId(stack.getItem());
+        return ITEM_THEMES.get(id);
+    }
 
-        String itemKey = ITEM_THEMES.get(id);
-        if (itemKey != null) return itemKey;
+    /** Returns only the first matching tag theme, or {@code null}. */
+    public static @Nullable String resolveTagThemeForStack(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) return null;
 
         for (TagEntry entry : TAG_ENTRIES) {
             if (entry.themeKey() != null && stack.isIn(entry.tag()))
