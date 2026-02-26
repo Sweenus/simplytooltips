@@ -686,6 +686,7 @@ public class TooltipRenderer {
             case TooltipBorderStyle.DEEP_DARK -> "deepdark";
             case TooltipBorderStyle.POISON    -> "poison";
             case TooltipBorderStyle.OCEAN     -> "ocean";
+            case TooltipBorderStyle.RUSTIC    -> "rustic";
             default -> null;
         };
     }
@@ -709,6 +710,7 @@ public class TooltipRenderer {
             case "deepdark"  -> TooltipBorderStyle.DEEP_DARK;
             case "poison"    -> TooltipBorderStyle.POISON;
             case "ocean"     -> TooltipBorderStyle.OCEAN;
+            case "rustic"    -> TooltipBorderStyle.RUSTIC;
             default          -> TooltipBorderStyle.DEFAULT;
         };
     }

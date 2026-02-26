@@ -17,6 +17,7 @@ public final class TooltipBorderStyle {
     public static final int DEEP_DARK = 13;
     public static final int POISON = 14;
     public static final int OCEAN = 15;
+    public static final int RUSTIC = 16;
 
     private TooltipBorderStyle() {}
 }

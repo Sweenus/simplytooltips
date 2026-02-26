@@ -401,6 +401,34 @@ public class BorderRenderer {
                 context.fill(x + 3, y + h - 4, x + 5, y + h - 3, hot);
                 context.fill(x + w - 5, y + h - 4, x + w - 3, y + h - 3, hot);
             }
+            case TooltipBorderStyle.RUSTIC -> {
+                int woodA = 0xFFA87A4A;
+                int woodB = 0xFF7B5532;
+                int straw = 0xFFD7B37A;
+                int nail = 0xFF4B5A5D;
+
+                for (int px = x + 9, i = 0; px < x + w - 10; px += 14, i++) {
+                    boolean flip = (i & 1) == 0;
+
+                    // Top wood notch
+                    context.fill(px, y + 1, px + 3, y + 2, woodA);
+                    context.fill(px + 1, y + 2, px + 4, y + 3, woodB);
+                    if (flip) context.fill(px + 1, y + 1, px + 2, y + 2, straw);
+                    else      context.fill(px + 2, y + 1, px + 3, y + 2, straw);
+
+                    // Bottom mirrored notch
+                    context.fill(px, y + h - 3, px + 3, y + h - 2, woodA);
+                    context.fill(px - 1, y + h - 2, px + 2, y + h - 1, woodB);
+                    if (flip) context.fill(px, y + h - 3, px + 1, y + h - 2, straw);
+                    else      context.fill(px + 1, y + h - 3, px + 2, y + h - 2, straw);
+                }
+
+                // tiny rivet-like corner studs
+                context.fill(x + 3, y + 3, x + 4, y + 4, nail);
+                context.fill(x + w - 4, y + 3, x + w - 3, y + 4, nail);
+                context.fill(x + 3, y + h - 4, x + 4, y + h - 3, nail);
+                context.fill(x + w - 4, y + h - 4, x + w - 3, y + h - 3, nail);
+            }
             default -> {}
         }
     }
