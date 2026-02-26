@@ -143,6 +143,10 @@ public class TooltipRenderer {
 
         UpgradeSection upgradeSection = model.upgradeSection();
         boolean hasUpgrade = upgradeSection != null;
+        boolean splitBowUpgradeTabs = hasUpgrade && tabsActive && isSimplyBowsStack(stack);
+        boolean drawUpgradeSummary = hasUpgrade && splitBowUpgradeTabs && drawLore;
+        boolean drawUpgradeRuneDetails = hasUpgrade && splitBowUpgradeTabs && drawForge;
+        boolean drawUpgradeFull = hasUpgrade && !splitBowUpgradeTabs && drawForge;
         boolean extraNeedsSeparator = hasExtra && drawStats && (
                 hasBody
                         || (!tabsActive && (hasAbility || hasUpgrade))
@@ -151,7 +155,9 @@ public class TooltipRenderer {
                 ? TooltipPainter.wrapStrings(upgradeSection.rune().effectLines(), tr, maxTextWidth())
                 : List.of();
         boolean hasBodyContent = (hasAbility && drawLore)
-                || (hasUpgrade && drawForge)
+                || drawUpgradeSummary
+                || drawUpgradeRuneDetails
+                || drawUpgradeFull
                 || ((hasBody || hasExtra) && drawStats);
 
         // Panel width
@@ -233,15 +239,28 @@ public class TooltipRenderer {
                 }
             }
         }
-        if (hasAbility && drawLore && hasUpgrade && drawForge) bodyH += separatorH;
-        if (hasUpgrade && drawForge) {
+        if (hasAbility && drawLore && (drawUpgradeSummary || drawUpgradeFull)) bodyH += separatorH;
+        if (drawUpgradeFull) {
             bodyH += lineHeight + sectionGap;              // "◆ Upgrades" header
             bodyH += upgradeRowH;                          // Slots row
             bodyH += upgradeRowH * upgradeSection.rows().size();
             bodyH += lineHeight;                           // spacer before rune
             bodyH += upgradeRowH + wrappedRuneEffect.size() * lineHeight;
+        } else if (drawUpgradeSummary) {
+            bodyH += lineHeight + sectionGap;              // "◆ Upgrades" header
+            bodyH += upgradeRowH;                          // Slots row
+            bodyH += upgradeRowH * upgradeSection.rows().size();
+            bodyH += lineHeight;                           // spacer before rune
+            bodyH += upgradeRowH;                          // Rune name row
+        } else if (drawUpgradeRuneDetails) {
+            bodyH += lineHeight + sectionGap;              // "◆ Rune" header
+            bodyH += upgradeRowH;                          // Rune name row
+            bodyH += wrappedRuneEffect.size() * lineHeight;
         }
-        if ((hasAbility && drawLore || hasUpgrade && drawForge) && hasBody && drawStats) bodyH += separatorH;
+        if (((hasAbility && drawLore) || drawUpgradeSummary || drawUpgradeRuneDetails || drawUpgradeFull)
+                && hasBody && drawStats) {
+            bodyH += separatorH;
+        }
         if (hasBody && drawStats) {
             for (InlineStatRow stat : bodyStats) {
                 bodyH += statRowHeight(stat, lineHeight);
@@ -429,13 +448,13 @@ public class TooltipRenderer {
         }
 
         // ---- Separator between ability and upgrades ----
-        if (hasAbility && drawLore && hasUpgrade && drawForge) {
+        if (hasAbility && drawLore && (drawUpgradeSummary || drawUpgradeFull)) {
             TooltipPainter.drawSeparator(context, panelX + padding(), cursorY, panelW - padding() * 2, theme);
             cursorY += separatorH;
         }
 
         // ---- Upgrade section ----
-        if (hasUpgrade && drawForge) {
+        if (drawUpgradeFull || drawUpgradeSummary) {
             int leftX = panelX + padding();
             context.drawText(tr,
                     Text.literal("\u25C6 Upgrades").setStyle(Style.EMPTY.withColor(
@@ -503,7 +522,7 @@ public class TooltipRenderer {
 
             cursorY += lineHeight; // spacer before rune
 
-            // Rune row
+            // Rune row (summary in split-bow tabs, full in default mode)
             UpgradeRune rune           = upgradeSection.rune();
             int runeLabelColor         = TooltipPainter.lerpColor(rune.runeColor(), 0xFFFFFFFF, 0.22f);
             int runeTextColor          = rune.isNone() ? 0xFF6A6060 : rune.runeColor();
@@ -524,6 +543,47 @@ public class TooltipRenderer {
                             TextColor.fromRgb(runeTextColor & 0x00FFFFFF))),
                     runeValX, cursorY, runeTextColor, false);
             cursorY += upgradeRowH;
+            if (drawUpgradeFull) {
+                for (String effectLine : wrappedRuneEffect) {
+                    context.drawText(tr,
+                            Text.literal(effectLine).setStyle(Style.EMPTY.withColor(
+                                    TextColor.fromRgb(runeDescColor & 0x00FFFFFF))),
+                            leftX, cursorY, runeDescColor, false);
+                    cursorY += lineHeight;
+                }
+            }
+        }
+
+        if (drawUpgradeRuneDetails) {
+            int leftX = panelX + padding();
+            UpgradeRune rune = upgradeSection.rune();
+            int runeLabelColor = TooltipPainter.lerpColor(rune.runeColor(), 0xFFFFFFFF, 0.22f);
+            int runeTextColor  = rune.isNone() ? 0xFF6A6060 : rune.runeColor();
+            int runeDescColor  = rune.isNone() ? 0xFF6A6060
+                    : TooltipPainter.lerpColor(rune.runeColor(), theme.body(), 0.45f);
+
+            context.drawText(tr,
+                    Text.literal("\u25C6 Rune").setStyle(Style.EMPTY.withColor(
+                            TextColor.fromRgb(theme.sectionHeader() & 0x00FFFFFF))),
+                    leftX, cursorY, theme.sectionHeader(), true);
+            cursorY += lineHeight + sectionGap;
+
+            context.drawText(tr,
+                    Text.literal("\u25CE").setStyle(Style.EMPTY.withColor(
+                            TextColor.fromRgb(rune.runeColor() & 0x00FFFFFF))),
+                    leftX, cursorY, rune.runeColor(), false);
+            int runeLabelX = leftX + tr.getWidth("\u25CE ");
+            context.drawText(tr,
+                    Text.literal("Rune: ").setStyle(Style.EMPTY.withColor(
+                            TextColor.fromRgb(runeLabelColor & 0x00FFFFFF))),
+                    runeLabelX, cursorY, runeLabelColor, false);
+            int runeValX = runeLabelX + tr.getWidth("Rune: ");
+            context.drawText(tr,
+                    Text.literal(rune.runeName()).setStyle(Style.EMPTY.withColor(
+                            TextColor.fromRgb(runeTextColor & 0x00FFFFFF))),
+                    runeValX, cursorY, runeTextColor, false);
+            cursorY += upgradeRowH;
+
             for (String effectLine : wrappedRuneEffect) {
                 context.drawText(tr,
                         Text.literal(effectLine).setStyle(Style.EMPTY.withColor(
@@ -534,7 +594,8 @@ public class TooltipRenderer {
         }
 
         // ---- Separator between (ability/upgrades) and body ----
-        if ((hasAbility && drawLore || hasUpgrade && drawForge) && hasBody && drawStats) {
+        if (((hasAbility && drawLore) || drawUpgradeSummary || drawUpgradeRuneDetails || drawUpgradeFull)
+                && hasBody && drawStats) {
             TooltipPainter.drawSeparator(context, panelX + padding(), cursorY, panelW - padding() * 2, theme);
             cursorY += separatorH;
         }
@@ -812,6 +873,11 @@ public class TooltipRenderer {
         }
 
         return new AbilitySectionData(header, lines);
+    }
+
+    private static boolean isSimplyBowsStack(ItemStack stack) {
+        Identifier id = Registries.ITEM.getId(stack.getItem());
+        return id != null && "simplybows".equals(id.getNamespace());
     }
 
     private record InlineStatRow(String label, double value, double min, double max) {}
