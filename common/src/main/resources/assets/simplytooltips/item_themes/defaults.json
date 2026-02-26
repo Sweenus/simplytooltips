@@ -50,7 +50,14 @@
     "simplyswords:caelestis":            { "theme": "enchanted", "badges": ["UNIQUE", "CLAYMORE"]   },
     "simplyswords:wraithfang":           { "theme": "echo",      "badges": ["UNIQUE", "DAGGER"]     },
     "simplyswords:chompolotl":           { "theme": "bubble",    "badges": ["UNIQUE", "CHAKRAM"]    },
-    "simplyswords:dreadtide":            { "theme": "bubble",    "badges": ["UNIQUE", "TWINBLADE"]  }
+    "simplyswords:dreadtide":            { "theme": "bubble",    "badges": ["UNIQUE", "TWINBLADE"]  },
+
+    "simplybows:upgrades/rune_etching_grace":               { "theme": "autumn",    "badges": ["UPGRADE"] },
+    "simplybows:upgrades/rune_etching_pain":                { "theme": "autumn",    "badges": ["UPGRADE"] },
+    "simplybows:upgrades/rune_etching_chaos":               { "theme": "autumn",    "badges": ["UPGRADE"] },
+    "simplybows:upgrades/rune_etching_bounty":              { "theme": "autumn",    "badges": ["UPGRADE"] },
+    "simplybows:upgrades/upgrades/reinforced_bow_frame":    { "theme": "autumn",    "badges": ["UPGRADE"] },
+    "simplybows:upgrades/upgrades/enchanted_bow_string":    { "theme": "autumn",    "badges": ["UPGRADE"] }
   },
   "tags": [
     { "tag": "minecraft:swords",    "badges": ["SWORD"]   },
