@@ -4,8 +4,11 @@ import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.component.type.AttributeModifiersComponent;
+import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.registry.Registries;
+import net.minecraft.registry.RegistryKeys;
+import net.minecraft.registry.tag.TagKey;
 import net.minecraft.text.Style;
 import net.minecraft.text.Text;
 import net.minecraft.text.TextColor;
@@ -32,6 +35,13 @@ public class TooltipRenderer {
     private static final Pattern INLINE_STAT_PATTERN = Pattern.compile(
             "^\\s*([+-]?\\d+(?:\\.\\d+)?)\\s+(Attack Damage|Attack Speed|Attack Range)\\s*$",
             Pattern.CASE_INSENSITIVE
+    );
+    private static final Pattern SS_UNIQUE_EFFECT_PATTERN = Pattern.compile(
+            "(?i)^.*?unique\\s+effect\\s*:\\s*(.+?)\\s*$"
+    );
+    private static final String DEFAULT_ABILITY_HEADER = "Description";
+    private static final TagKey<Item> SIMPLYSWORDS_UNIQUES_TAG = TagKey.of(
+            RegistryKeys.ITEM, Identifier.of("simplyswords", "uniques")
     );
     private static final String STAT_LABEL_REFERENCE = "Attack Damage";
     private static final int STAT_BAR_MIN_WIDTH = 52;
@@ -84,7 +94,8 @@ public class TooltipRenderer {
         long tooltipElapsedMs = TooltipAnimator.updateAndGetElapsed(stack, model.animKeyExtra());
 
         // ---- Text wrapping ----
-        List<String> wrappedAbility = TooltipPainter.wrapStrings(model.abilityLines(), tr, maxTextWidth());
+        AbilitySectionData abilitySection = prepareAbilitySection(stack, model.abilityLines());
+        List<String> wrappedAbility = TooltipPainter.wrapStrings(abilitySection.lines(), tr, maxTextWidth());
         List<String> wrappedBody    = TooltipPainter.wrapStrings(model.bodyLines(), tr, maxTextWidth());
         List<InlineStatRow> bodyStats = new ArrayList<>(wrappedBody.size());
         for (String line : wrappedBody) {
@@ -142,6 +153,9 @@ public class TooltipRenderer {
         // Panel width
         int textContentW = 0;
         textContentW = Math.max(textContentW, tr.getWidth(model.title()) + iconAreaW + 4);
+        if (!wrappedAbility.isEmpty()) {
+            textContentW = Math.max(textContentW, tr.getWidth("\u25C6 " + abilitySection.header()));
+        }
         for (String s : wrappedAbility) {
             // Strip SECTION_MARKER and add "◆ " prefix for accurate width measurement
             String measured = s.startsWith(ModernTooltipModel.SECTION_MARKER)
@@ -366,7 +380,7 @@ public class TooltipRenderer {
         // ---- Ability / Description section ----
         if (hasAbility && drawLore) {
             context.drawText(tr,
-                    Text.literal("\u25C6 Description").setStyle(Style.EMPTY.withColor(
+                    Text.literal("\u25C6 " + abilitySection.header()).setStyle(Style.EMPTY.withColor(
                             TextColor.fromRgb(theme.sectionHeader() & 0x00FFFFFF))),
                     panelX + padding(), cursorY, theme.sectionHeader(), true);
             cursorY += lineHeight + sectionGap;
@@ -736,7 +750,41 @@ public class TooltipRenderer {
         return w;
     }
 
+    private static AbilitySectionData prepareAbilitySection(ItemStack stack, List<String> abilityLines) {
+        List<String> lines = new ArrayList<>(abilityLines);
+        String header = DEFAULT_ABILITY_HEADER;
+
+        Identifier id = Registries.ITEM.getId(stack.getItem());
+        if (id == null || !"simplyswords".equals(id.getNamespace()) || !stack.isIn(SIMPLYSWORDS_UNIQUES_TAG)) {
+            return new AbilitySectionData(header, lines);
+        }
+
+        for (int i = 0; i < lines.size(); i++) {
+            String raw = lines.get(i);
+            if (raw == null || raw.isBlank()) continue;
+
+            String content = raw.startsWith(ModernTooltipModel.SECTION_MARKER)
+                    ? raw.substring(ModernTooltipModel.SECTION_MARKER.length())
+                    : raw;
+            content = content.replace('\u00A0', ' ').trim();
+
+            Matcher matcher = SS_UNIQUE_EFFECT_PATTERN.matcher(content);
+            if (!matcher.matches()) continue;
+
+            String abilityName = matcher.group(1).trim();
+            if (!abilityName.isEmpty()) {
+                header = abilityName;
+                lines.remove(i);
+            }
+            break;
+        }
+
+        return new AbilitySectionData(header, lines);
+    }
+
     private record InlineStatRow(String label, double value, double min, double max) {}
+
+    private record AbilitySectionData(String header, List<String> lines) {}
 
     private TooltipRenderer() {}
 }
