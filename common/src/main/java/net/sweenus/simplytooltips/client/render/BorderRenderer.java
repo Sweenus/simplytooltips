@@ -310,6 +310,65 @@ public class BorderRenderer {
                 context.fill(x + 3, y + h - 4, x + 5, y + h - 3, core);
                 context.fill(x + w - 5, y + h - 4, x + w - 3, y + h - 3, core);
             }
+            case TooltipBorderStyle.DEEP_DARK -> {
+                int veinA = 0xFF2E8985;
+                int veinB = 0xFF235F5B;
+                int glow  = 0xFF66D7CD;
+                int ink   = 0xFF142327;
+
+                for (int px = x + 9, i = 0; px < x + w - 10; px += 12, i++) {
+                    boolean flip = (i & 1) == 0;
+
+                    context.fill(px, y + 1, px + 2, y + 2, veinA);
+                    context.fill(px + 1, y + 2, px + 3, y + 3, veinB);
+                    context.fill(px + 1, y + 1, px + 2, y + 2, glow);
+                    if (flip) context.fill(px - 1, y + 2, px, y + 3, ink);
+                    else      context.fill(px + 3, y + 2, px + 4, y + 3, ink);
+
+                    context.fill(px, y + h - 3, px + 2, y + h - 2, veinA);
+                    context.fill(px - 1, y + h - 2, px + 1, y + h - 1, veinB);
+                    context.fill(px, y + h - 2, px + 1, y + h - 1, glow);
+                    if (flip) context.fill(px + 2, y + h - 2, px + 3, y + h - 1, ink);
+                    else      context.fill(px - 2, y + h - 2, px - 1, y + h - 1, ink);
+                }
+
+                context.fill(x + 3, y + 3, x + 5, y + 5, glow);
+                context.fill(x + w - 5, y + 3, x + w - 3, y + 5, glow);
+                context.fill(x + 3, y + h - 5, x + 5, y + h - 3, glow);
+                context.fill(x + w - 5, y + h - 5, x + w - 3, y + h - 3, glow);
+            }
+            case TooltipBorderStyle.POISON -> {
+                int oozeA = 0xFF6AB64A;
+                int oozeB = 0xFF3C8A34;
+                int toxic = 0xFFA5F06E;
+                int dark  = 0xFF223A1E;
+
+                for (int px = x + 9, i = 0; px < x + w - 10; px += 12, i++) {
+                    boolean flip = (i & 1) == 0;
+
+                    // Top ooze drips
+                    context.fill(px, y + 1, px + 2, y + 2, oozeA);
+                    context.fill(px + 1, y + 2, px + 3, y + 3, oozeB);
+                    if (flip) context.fill(px + 1, y + 3, px + 2, y + 4, toxic);
+                    else      context.fill(px, y + 3, px + 1, y + 4, toxic);
+
+                    // Bottom mirrored spores
+                    context.fill(px, y + h - 3, px + 2, y + h - 2, oozeA);
+                    context.fill(px - 1, y + h - 2, px + 1, y + h - 1, oozeB);
+                    if (flip) context.fill(px, y + h - 4, px + 1, y + h - 3, toxic);
+                    else      context.fill(px + 1, y + h - 4, px + 2, y + h - 3, toxic);
+
+                    if ((i % 3) == 1) {
+                        context.fill(px + 3, y + 1, px + 4, y + 2, dark);
+                        context.fill(px - 2, y + h - 2, px - 1, y + h - 1, dark);
+                    }
+                }
+
+                context.fill(x + 3, y + 3, x + 5, y + 4, toxic);
+                context.fill(x + w - 5, y + 3, x + w - 3, y + 4, toxic);
+                context.fill(x + 3, y + h - 4, x + 5, y + h - 3, toxic);
+                context.fill(x + w - 5, y + h - 4, x + w - 3, y + h - 3, toxic);
+            }
             default -> {}
         }
     }

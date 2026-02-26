@@ -683,6 +683,8 @@ public class TooltipRenderer {
             case TooltipBorderStyle.ENCHANTED -> "enchanted";
             case TooltipBorderStyle.AUTUMN    -> "autumn";
             case TooltipBorderStyle.SOUL      -> "soul";
+            case TooltipBorderStyle.DEEP_DARK -> "deepdark";
+            case TooltipBorderStyle.POISON    -> "poison";
             default -> null;
         };
     }
@@ -703,6 +705,8 @@ public class TooltipRenderer {
             case "enchanted" -> TooltipBorderStyle.ENCHANTED;
             case "autumn"    -> TooltipBorderStyle.AUTUMN;
             case "soul"      -> TooltipBorderStyle.SOUL;
+            case "deepdark"  -> TooltipBorderStyle.DEEP_DARK;
+            case "poison"    -> TooltipBorderStyle.POISON;
             default          -> TooltipBorderStyle.DEFAULT;
         };
     }

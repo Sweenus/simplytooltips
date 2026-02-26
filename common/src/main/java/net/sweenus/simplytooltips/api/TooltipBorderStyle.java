@@ -14,6 +14,8 @@ public final class TooltipBorderStyle {
     public static final int ENCHANTED = 10;
     public static final int AUTUMN = 11;
     public static final int SOUL = 12;
+    public static final int DEEP_DARK = 13;
+    public static final int POISON = 14;
 
     private TooltipBorderStyle() {}
 }
