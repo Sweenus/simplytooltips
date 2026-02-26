@@ -26,6 +26,7 @@ public class MotifRegistry {
         MOTIFS.put("ice",       new IceMotif());
         MOTIFS.put("lightning", new LightningMotif());
         MOTIFS.put("autumn",    new AutumnMotif());
+        MOTIFS.put("soul",      new SoulMotif());
     }
 
     /**

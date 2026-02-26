@@ -1,6 +1,6 @@
 {
   "items": {
-    "minecraft:iron_sword":     { "theme": "autumn",     "badges": ["SWORD", "IRON"] },
+    "minecraft:iron_sword":     { "theme": "soul",     "badges": ["SWORD", "IRON"] },
     "minecraft:enchanted_book": { "theme": "enchanted", "badges": ["ENCHANT"]       },
 
     "simplyswords:watcher_claymore":     { "theme": "echo",      "badges": ["UNIQUE", "CLAYMORE"]   },
@@ -12,7 +12,7 @@
     "simplyswords:toxic_longsword":      { "theme": "vine",      "badges": ["UNIQUE", "LONGSWORD"]  },
     "simplyswords:emberblade":           { "theme": "ember",     "badges": ["UNIQUE", "LONGSWORD"]  },
     "simplyswords:frostfall":            { "theme": "ice",       "badges": ["UNIQUE", "HAMMER"]     },
-    "simplyswords:soulpyre":             { "theme": "ember",     "badges": ["UNIQUE", "GREATAXE"]   },
+    "simplyswords:soulpyre":             { "theme": "soul",      "badges": ["UNIQUE", "GREATAXE"]   },
     "simplyswords:molten_edge":          { "theme": "ember",     "badges": ["UNIQUE", "AXE"]        },
     "simplyswords:livyatan":             { "theme": "ice",       "badges": ["UNIQUE", "AXE"]        },
     "simplyswords:icewhisper":           { "theme": "ice",       "badges": ["UNIQUE", "HALBERD"]    },
@@ -21,8 +21,8 @@
     "simplyswords:hearthflame":          { "theme": "ember",     "badges": ["UNIQUE", "GREATHAMMER"]},
     "simplyswords:twisted_blade":        { "theme": "echo",      "badges": ["UNIQUE", "CLAYMORE"]   },
     "simplyswords:soulrender":           { "theme": "echo",      "badges": ["UNIQUE", "SCYTHE"]     },
-    "simplyswords:soulkeeper":           { "theme": "echo",      "badges": ["UNIQUE", "GREATHAMMER"]},
-    "simplyswords:soulstealer":          { "theme": "echo",      "badges": ["UNIQUE", "DAGGER"]     },
+    "simplyswords:soulkeeper":           { "theme": "soul",      "badges": ["UNIQUE", "GREATHAMMER"]},
+    "simplyswords:soulstealer":          { "theme": "soul",      "badges": ["UNIQUE", "DAGGER"]     },
     "simplyswords:mjolnir":              { "theme": "lightning", "badges": ["UNIQUE", "HAMMER"]     },
     "simplyswords:slumbering_lichblade": { "theme": "echo",      "badges": ["UNIQUE", "CLAYMORE"]   },
     "simplyswords:waking_lichblade":     { "theme": "echo",      "badges": ["UNIQUE", "CLAYMORE"]   },
