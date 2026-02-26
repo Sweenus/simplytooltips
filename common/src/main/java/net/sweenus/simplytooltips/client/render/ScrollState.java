@@ -16,6 +16,8 @@ import net.minecraft.util.Identifier;
 public class ScrollState {
 
     private static final double SCROLL_SPEED = 8.0;
+    /** Maximum age (ms) of the last tooltip render before scroll capture is considered stale. */
+    private static final long ACTIVE_TTL_MS = 80L;
 
     private static int        offsetPx          = 0;
     private static double     pendingScrollDelta = 0.0;
@@ -27,6 +29,7 @@ public class ScrollState {
      * Used by the mouse-scroll event handler to decide whether to consume the event.
      */
     private static boolean scrollableActive = false;
+    private static long    lastActiveRenderMs = 0L;
 
     /**
      * Must be called at the start of each tooltip render.
@@ -79,6 +82,9 @@ public class ScrollState {
      */
     public static void setScrollableActive(boolean active) {
         scrollableActive = active;
+        if (active) {
+            lastActiveRenderMs = System.currentTimeMillis();
+        }
     }
 
     /**
@@ -86,7 +92,12 @@ public class ScrollState {
      * Used by the mouse-scroll event handler to decide whether to consume the event.
      */
     public static boolean isScrollableActive() {
-        return scrollableActive;
+        if (!scrollableActive) return false;
+        if (System.currentTimeMillis() - lastActiveRenderMs > ACTIVE_TTL_MS) {
+            scrollableActive = false;
+            return false;
+        }
+        return true;
     }
 
     private ScrollState() {}

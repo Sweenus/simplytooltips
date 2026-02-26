@@ -1,5 +1,6 @@
 package net.sweenus.simplytooltips.mixin.client;
 
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.Mouse;
 import net.sweenus.simplytooltips.client.TooltipNavigationConfig;
 import net.sweenus.simplytooltips.client.render.ScrollState;
@@ -23,7 +24,14 @@ public abstract class ScreenScrollMixin {
     @Inject(method = "onMouseScroll(JDD)V", at = @At("HEAD"), cancellable = true)
     private void simplytooltips$onMouseScrolled(long window, double horizontal, double vertical,
             CallbackInfo ci) {
-        if (TooltipNavigationConfig.scrollableTooltip() && ScrollState.isScrollableActive()) {
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client == null || client.getWindow() == null) return;
+        if (window != client.getWindow().getHandle()) return;
+        if (client.currentScreen == null) return;
+        if (!TooltipNavigationConfig.scrollableTooltip()) return;
+        if (vertical == 0.0) return;
+
+        if (ScrollState.isScrollableActive()) {
             ScrollState.queueScroll(vertical);
             ci.cancel(); // prevent MC from accumulating this delta for screen/hotbar dispatch
         }
