@@ -13,6 +13,7 @@ import net.minecraft.util.Identifier;
 import net.minecraft.util.Rarity;
 import net.minecraft.util.math.RotationAxis;
 import net.sweenus.simplytooltips.api.*;
+import net.sweenus.simplytooltips.client.TooltipKeybinds;
 import net.sweenus.simplytooltips.client.TooltipNavigationConfig;
 import net.sweenus.simplytooltips.client.render.motif.BackgroundMotif;
 import net.sweenus.simplytooltips.config.SimplyTooltipsConfig;
@@ -552,8 +553,9 @@ public class TooltipRenderer {
 
         // ---- Footer dots (or tab indicator dots) ----
         if (tabsActive) {
-            TooltipPainter.drawTabDots(context, panelX + panelW / 2, panelY + panelH - 8,
-                    TabState.tabs(), TabState.activeTab(), theme);
+            String cycleTabKey = TooltipKeybinds.CYCLE_TAB.getBoundKeyLocalizedText().getString();
+            TooltipPainter.drawTabDotsWithKeyHint(context, tr, panelX + panelW / 2, panelY + panelH - 8,
+                    TabState.tabs(), TabState.activeTab(), theme, cycleTabKey);
         } else {
             TooltipPainter.drawFooterDots(context, panelX + panelW / 2, panelY + panelH - 8, theme);
         }

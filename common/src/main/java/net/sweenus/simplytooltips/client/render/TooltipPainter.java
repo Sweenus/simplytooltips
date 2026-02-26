@@ -271,6 +271,83 @@ public class TooltipPainter {
         }
     }
 
+    /**
+     * Draws tab indicator dots plus a small keycap hint to the right (e.g. "G").
+     * The keycap communicates the current keybind used to cycle tabs.
+     */
+    public static void drawTabDotsWithKeyHint(DrawContext context, TextRenderer tr, int cx, int y,
+                                              List<TabState.Tab> tabs, TabState.Tab activeTab,
+                                              TooltipTheme theme, String keyLabel) {
+        drawTabDots(context, cx, y, tabs, activeTab, theme);
+
+        String label = normaliseKeyLabel(keyLabel);
+        if (label.isEmpty()) return;
+
+        int n = tabs.size();
+        if (n <= 0) return;
+
+        int rightDotCx = cx + (n - 1) * 4;
+        float keyTextScale = 0.70f;
+        int textW = Math.max(1, Math.round(tr.getWidth(label) * keyTextScale));
+        int keyW = Math.max(10, textW + 6);
+        int keyH = 7;
+        int keyX = rightDotCx + 8;
+        int keyY = y - 4;
+
+        int keyBg = 0xFFFFFFFF;
+        int keyText = 0xFF202020;
+
+        // Flat key block: fixed white, no theme/shadow treatment.
+        context.fill(keyX, keyY, keyX + keyW, keyY + keyH, keyBg);
+
+        int textX = keyX + (keyW - textW) / 2;
+        int textY = keyY + 1;
+        context.getMatrices().push();
+        context.getMatrices().translate(textX, textY, 0);
+        context.getMatrices().scale(keyTextScale, keyTextScale, 1.0f);
+        context.drawText(tr,
+                Text.literal(label).setStyle(Style.EMPTY.withColor(TextColor.fromRgb(keyText & 0x00FFFFFF))),
+                0, 0, keyText, false);
+        context.getMatrices().pop();
+    }
+
+    private static String normaliseKeyLabel(String keyLabel) {
+        if (keyLabel == null) return "";
+        String s = keyLabel.trim();
+        if (s.isEmpty()) return "";
+
+        s = s.replace("Keyboard ", "")
+             .replace("keyboard.", "")
+             .replace("NUMPAD ", "NP")
+             .replace("LEFT ", "L")
+             .replace("RIGHT ", "R")
+             .replace("CONTROL", "CTRL");
+
+        if (s.startsWith("Mouse ")) {
+            String tail = s.substring("Mouse ".length()).trim();
+            if (!tail.isEmpty()) {
+                s = "M" + tail;
+            }
+        }
+        s = s.replace("Button ", "");
+
+        String lower = s.toLowerCase();
+        if (lower.equals("left alt") || lower.equals("right alt")
+                || lower.equals("lalt") || lower.equals("ralt")
+                || lower.equals("alt left") || lower.equals("alt right")) {
+            return "Alt";
+        }
+
+        if (s.equalsIgnoreCase("Unknown key") || s.equalsIgnoreCase("unknown")) {
+            return "";
+        }
+
+        if (s.length() > 1 && s.length() > 4) {
+            s = s.substring(0, 4);
+        }
+        return s.toUpperCase();
+    }
+
     // --- Badges ---
 
     /**
