@@ -3,6 +3,7 @@ package net.sweenus.simplytooltips.client.render;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.component.type.AttributeModifiersComponent;
 import net.minecraft.item.ItemStack;
 import net.minecraft.registry.Registries;
 import net.minecraft.text.Style;
@@ -18,12 +19,22 @@ import net.sweenus.simplytooltips.config.SimplyTooltipsConfig;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Main tooltip rendering pipeline.
  * Orchestrates layout calculations and delegates all drawing to the specialised helper classes.
  */
 public class TooltipRenderer {
+
+    private static final Pattern INLINE_STAT_PATTERN = Pattern.compile(
+            "^\\s*([+-]?\\d+(?:\\.\\d+)?)\\s+(Attack Damage|Attack Speed|Attack Range)\\s*$",
+            Pattern.CASE_INSENSITIVE
+    );
+    private static final String STAT_LABEL_REFERENCE = "Attack Damage";
+    private static final int STAT_BAR_MIN_WIDTH = 52;
+    private static final int STAT_BAR_HEIGHT = 4;
 
     private static int padding()      { return SimplyTooltipsConfig.INSTANCE.layout.padding.get(); }
     private static int lineSpacing()  { return SimplyTooltipsConfig.INSTANCE.layout.lineSpacing.get(); }
@@ -74,9 +85,17 @@ public class TooltipRenderer {
         // ---- Text wrapping ----
         List<String> wrappedAbility = TooltipPainter.wrapStrings(model.abilityLines(), tr, maxTextWidth());
         List<String> wrappedBody    = TooltipPainter.wrapStrings(model.bodyLines(), tr, maxTextWidth());
+        List<InlineStatRow> bodyStats = new ArrayList<>(wrappedBody.size());
+        for (String line : wrappedBody) {
+            bodyStats.add(parseInlineStatRow(line));
+        }
         List<String> wrappedExtra   = new ArrayList<>();
         for (Text t : model.extraLines()) {
             wrappedExtra.addAll(TooltipPainter.wrapStrings(List.of(t.getString()), tr, maxTextWidth()));
+        }
+        List<InlineStatRow> extraStats = new ArrayList<>(wrappedExtra.size());
+        for (String line : wrappedExtra) {
+            extraStats.add(parseInlineStatRow(line));
         }
 
         // ---- Tab and scroll state ----
@@ -128,8 +147,24 @@ public class TooltipRenderer {
                     ? "\u25C6 " + s.substring(ModernTooltipModel.SECTION_MARKER.length()) : s;
             textContentW = Math.max(textContentW, tr.getWidth(measured));
         }
-        for (String s : wrappedBody)    textContentW = Math.max(textContentW, tr.getWidth(s));
-        for (String s : wrappedExtra)   textContentW = Math.max(textContentW, tr.getWidth(s));
+        for (int i = 0; i < wrappedBody.size(); i++) {
+            InlineStatRow stat = bodyStats.get(i);
+            if (stat != null) {
+                int statW = statRowMinWidth(tr, stat);
+                textContentW = Math.max(textContentW, statW);
+            } else {
+                textContentW = Math.max(textContentW, tr.getWidth(wrappedBody.get(i)));
+            }
+        }
+        for (int i = 0; i < wrappedExtra.size(); i++) {
+            InlineStatRow stat = extraStats.get(i);
+            if (stat != null) {
+                int statW = statRowMinWidth(tr, stat);
+                textContentW = Math.max(textContentW, statW);
+            } else {
+                textContentW = Math.max(textContentW, tr.getWidth(wrappedExtra.get(i)));
+            }
+        }
 
         if (hasUpgrade) {
             int slotsW = tr.getWidth("\u25C7 ") + tr.getWidth("Slots  ") + 2
@@ -468,11 +503,19 @@ public class TooltipRenderer {
 
         // ---- Body lines ----
         if (hasBody && drawStats) {
-            for (String line : wrappedBody) {
-                context.drawText(tr,
-                        Text.literal(line).setStyle(Style.EMPTY.withColor(
-                                TextColor.fromRgb(theme.body() & 0x00FFFFFF))),
-                        panelX + padding(), cursorY, theme.body(), true);
+            int contentLeft = panelX + padding();
+            int contentRight = panelX + panelW - padding();
+            for (int i = 0; i < wrappedBody.size(); i++) {
+                String line = wrappedBody.get(i);
+                InlineStatRow stat = bodyStats.get(i);
+                if (stat != null) {
+                    drawInlineStatRow(context, tr, stat, contentLeft, contentRight, cursorY, theme);
+                } else {
+                    context.drawText(tr,
+                            Text.literal(line).setStyle(Style.EMPTY.withColor(
+                                    TextColor.fromRgb(theme.body() & 0x00FFFFFF))),
+                            contentLeft, cursorY, theme.body(), true);
+                }
                 cursorY += lineHeight;
             }
         }
@@ -482,11 +525,19 @@ public class TooltipRenderer {
             TooltipPainter.drawSeparator(context, panelX + padding(), cursorY, panelW - padding() * 2, theme);
             cursorY += separatorH;
             int extraColor = TooltipPainter.lerpColor(theme.body(), 0xFFB8C2CF, 0.30f);
-            for (String line : wrappedExtra) {
-                context.drawText(tr,
-                        Text.literal(line).setStyle(Style.EMPTY.withColor(
-                                TextColor.fromRgb(extraColor & 0x00FFFFFF))),
-                        panelX + padding(), cursorY, extraColor, true);
+            int contentLeft = panelX + padding();
+            int contentRight = panelX + panelW - padding();
+            for (int i = 0; i < wrappedExtra.size(); i++) {
+                String line = wrappedExtra.get(i);
+                InlineStatRow stat = extraStats.get(i);
+                if (stat != null) {
+                    drawInlineStatRow(context, tr, stat, contentLeft, contentRight, cursorY, theme);
+                } else {
+                    context.drawText(tr,
+                            Text.literal(line).setStyle(Style.EMPTY.withColor(
+                                    TextColor.fromRgb(extraColor & 0x00FFFFFF))),
+                            contentLeft, cursorY, extraColor, true);
+                }
                 cursorY += lineHeight;
             }
         }
@@ -585,6 +636,99 @@ public class TooltipRenderer {
             default       -> "rarity_common";
         };
     }
+
+    private static InlineStatRow parseInlineStatRow(String line) {
+        if (line == null) return null;
+        Matcher matcher = INLINE_STAT_PATTERN.matcher(line);
+        if (!matcher.matches()) return null;
+
+        double value;
+        try {
+            value = Double.parseDouble(matcher.group(1));
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+
+        String rawLabel = matcher.group(2).toLowerCase();
+        return switch (rawLabel) {
+            case "attack damage" -> new InlineStatRow("Attack Damage", value, 0.0, 14.0);
+            case "attack speed"  -> new InlineStatRow("Attack Speed",  value, 0.0, 3.0);
+            case "attack range"  -> new InlineStatRow("Attack Range",  value, 0.0, 5.0);
+            default -> null;
+        };
+    }
+
+    private static String formatStatValue(double value) {
+        return AttributeModifiersComponent.DECIMAL_FORMAT.format(value);
+    }
+
+    private static void drawInlineStatRow(DrawContext context, TextRenderer tr, InlineStatRow stat,
+                                          int contentLeft, int contentRight, int y, TooltipTheme theme) {
+        int labelColumnW = statLabelColumnWidth(tr);
+        int valueColumnW = statValueColumnWidth(tr);
+        String valueText = formatStatValue(stat.value());
+        int valueW = tr.getWidth(valueText);
+        int valueX = contentRight - valueW;
+
+        context.drawText(tr,
+                Text.literal(stat.label()).setStyle(Style.EMPTY.withColor(
+                        TextColor.fromRgb(theme.body() & 0x00FFFFFF))),
+                contentLeft, y, theme.body(), true);
+        context.drawText(tr,
+                Text.literal(valueText).setStyle(Style.EMPTY.withColor(
+                        TextColor.fromRgb(theme.sectionHeader() & 0x00FFFFFF))),
+                valueX, y, theme.sectionHeader(), true);
+
+        int barStart = contentLeft + labelColumnW + 8;
+        int barEnd = (contentRight - valueColumnW) - 8;
+        if (barEnd - barStart < STAT_BAR_MIN_WIDTH) {
+            barStart = Math.max(contentLeft + labelColumnW + 4, barEnd - STAT_BAR_MIN_WIDTH);
+        }
+        if (barEnd <= barStart + 2) {
+            return;
+        }
+
+        int barY = y + (tr.fontHeight - STAT_BAR_HEIGHT) / 2 + 1;
+        int darkBar = TooltipPainter.lerpColor(theme.bgBottom(), 0xFF000000, 0.35f);
+        context.fill(barStart, barY, barEnd, barY + STAT_BAR_HEIGHT, darkBar);
+
+        float t = (float) ((stat.value() - stat.min()) / (stat.max() - stat.min()));
+        t = Math.max(0.0f, Math.min(1.0f, t));
+        int fillEnd = barStart + Math.round((barEnd - barStart) * t);
+        int fillColor = statFillColor(t);
+        if (fillEnd > barStart) {
+            context.fill(barStart, barY, fillEnd, barY + STAT_BAR_HEIGHT, fillColor);
+        }
+    }
+
+    private static int statFillColor(float t) {
+        int red = 0xFFC9564A;
+        int orange = 0xFFE3A54C;
+        int green = 0xFF6FCB63;
+        if (t <= 0.5f) {
+            return TooltipPainter.lerpColor(red, orange, t / 0.5f);
+        }
+        return TooltipPainter.lerpColor(orange, green, (t - 0.5f) / 0.5f);
+    }
+
+    private static int statRowMinWidth(TextRenderer tr, InlineStatRow stat) {
+        return statLabelColumnWidth(tr) + 8 + STAT_BAR_MIN_WIDTH + 8 + statValueColumnWidth(tr);
+    }
+
+    private static int statLabelColumnWidth(TextRenderer tr) {
+        return tr.getWidth(STAT_LABEL_REFERENCE);
+    }
+
+    private static int statValueColumnWidth(TextRenderer tr) {
+        int w = 0;
+        w = Math.max(w, tr.getWidth(formatStatValue(0.0)));
+        w = Math.max(w, tr.getWidth(formatStatValue(5.0)));
+        w = Math.max(w, tr.getWidth(formatStatValue(10.0)));
+        w = Math.max(w, tr.getWidth(formatStatValue(32.0)));
+        return w;
+    }
+
+    private record InlineStatRow(String label, double value, double min, double max) {}
 
     private TooltipRenderer() {}
 }
