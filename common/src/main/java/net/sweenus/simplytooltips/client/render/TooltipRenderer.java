@@ -687,6 +687,7 @@ public class TooltipRenderer {
             case TooltipBorderStyle.POISON    -> "poison";
             case TooltipBorderStyle.OCEAN     -> "ocean";
             case TooltipBorderStyle.RUSTIC    -> "rustic";
+            case TooltipBorderStyle.HONEY     -> "honey";
             default -> null;
         };
     }
@@ -711,6 +712,7 @@ public class TooltipRenderer {
             case "poison"    -> TooltipBorderStyle.POISON;
             case "ocean"     -> TooltipBorderStyle.OCEAN;
             case "rustic"    -> TooltipBorderStyle.RUSTIC;
+            case "honey"     -> TooltipBorderStyle.HONEY;
             default          -> TooltipBorderStyle.DEFAULT;
         };
     }

@@ -76,6 +76,38 @@ public class BorderRenderer {
                 context.fill(x + 3, y + h - 5, x + 5, y + h - 4, 0x99DDF7FF);
                 context.fill(x + w - 5, y + h - 5, x + w - 3, y + h - 4, 0x99DDF7FF);
             }
+            case TooltipBorderStyle.HONEY -> {
+                int combA = 0xFFE0A72E;
+                int combB = 0xFFF3CC6C;
+                int wax = 0xFFFBE8AB;
+                int outline = 0xFF6B4714;
+
+                for (int px = x + 8, i = 0; px < x + w - 9; px += 11, i++) {
+                    boolean shift = (i & 1) == 0;
+
+                    // Top mini-hex notch
+                    context.fill(px + 1, y + 1, px + 4, y + 2, combA);
+                    context.fill(px, y + 2, px + 1, y + 3, outline);
+                    context.fill(px + 4, y + 2, px + 5, y + 3, outline);
+                    context.fill(px + 1, y + 3, px + 4, y + 4, combB);
+                    context.fill(px + 2, y + 2, px + 3, y + 3, wax);
+                    if (shift) context.fill(px + 2, y, px + 3, y + 1, wax);
+
+                    // Bottom mirrored notch
+                    context.fill(px + 1, y + h - 4, px + 4, y + h - 3, combA);
+                    context.fill(px, y + h - 3, px + 1, y + h - 2, outline);
+                    context.fill(px + 4, y + h - 3, px + 5, y + h - 2, outline);
+                    context.fill(px + 1, y + h - 2, px + 4, y + h - 1, combB);
+                    context.fill(px + 2, y + h - 3, px + 3, y + h - 2, wax);
+                    if (!shift) context.fill(px + 2, y + h - 1, px + 3, y + h, wax);
+                }
+
+                // Sticky corner highlights
+                context.fill(x + 3, y + 3, x + 5, y + 5, 0x88FFE6A0);
+                context.fill(x + w - 5, y + 3, x + w - 3, y + 5, 0x88FFE6A0);
+                context.fill(x + 3, y + h - 5, x + 5, y + h - 3, 0x88FFE6A0);
+                context.fill(x + w - 5, y + h - 5, x + w - 3, y + h - 3, 0x88FFE6A0);
+            }
             case TooltipBorderStyle.BLOSSOM -> {
                 int petal = 0xFFF3B1D2, core = 0xFFFFF4BE;
                 for (int px = x + 12; px < x + w - 12; px += 16) {
