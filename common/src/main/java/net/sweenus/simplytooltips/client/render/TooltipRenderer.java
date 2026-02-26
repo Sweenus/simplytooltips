@@ -143,6 +143,10 @@ public class TooltipRenderer {
 
         UpgradeSection upgradeSection = model.upgradeSection();
         boolean hasUpgrade = upgradeSection != null;
+        boolean extraNeedsSeparator = hasExtra && drawStats && (
+                hasBody
+                        || (!tabsActive && (hasAbility || hasUpgrade))
+        );
         List<String> wrappedRuneEffect = hasUpgrade
                 ? TooltipPainter.wrapStrings(upgradeSection.rune().effectLines(), tr, maxTextWidth())
                 : List.of();
@@ -217,11 +221,15 @@ public class TooltipRenderer {
         int bodyH = 0;
         if (hasAbility && drawLore) {
             bodyH += lineHeight + sectionGap; // "◆ Description" header
+            boolean sawAbilityContent = false;
             for (String line : wrappedAbility) {
                 if (line.startsWith(ModernTooltipModel.SECTION_MARKER)) {
-                    bodyH += separatorH + lineHeight + sectionGap; // separator + sub-header
+                    bodyH += (sawAbilityContent ? separatorH : 0) + lineHeight + sectionGap; // optional separator + sub-header
                 } else {
                     bodyH += lineHeight;
+                    if (!line.trim().isEmpty()) {
+                        sawAbilityContent = true;
+                    }
                 }
             }
         }
@@ -234,8 +242,17 @@ public class TooltipRenderer {
             bodyH += upgradeRowH + wrappedRuneEffect.size() * lineHeight;
         }
         if ((hasAbility && drawLore || hasUpgrade && drawForge) && hasBody && drawStats) bodyH += separatorH;
-        if (hasBody && drawStats)  bodyH += wrappedBody.size() * lineHeight;
-        if (hasExtra && drawStats) bodyH += separatorH + wrappedExtra.size() * lineHeight;
+        if (hasBody && drawStats) {
+            for (InlineStatRow stat : bodyStats) {
+                bodyH += statRowHeight(stat, lineHeight);
+            }
+        }
+        if (hasExtra && drawStats) {
+            bodyH += extraNeedsSeparator ? separatorH : 0;
+            for (InlineStatRow stat : extraStats) {
+                bodyH += statRowHeight(stat, lineHeight);
+            }
+        }
 
         int footerH = 14;
         int panelH  = headerH + (hasBodyContent ? separatorH : 0) + bodyH + footerH;
@@ -384,12 +401,15 @@ public class TooltipRenderer {
                             TextColor.fromRgb(theme.sectionHeader() & 0x00FFFFFF))),
                     panelX + padding(), cursorY, theme.sectionHeader(), true);
             cursorY += lineHeight + sectionGap;
+            boolean sawAbilityContent = false;
             for (String line : wrappedAbility) {
                 if (line.startsWith(ModernTooltipModel.SECTION_MARKER)) {
                     // Sub-section header: separator + "◆ " label in sectionHeader colour
                     String headerText = "\u25C6 " + line.substring(ModernTooltipModel.SECTION_MARKER.length());
-                    TooltipPainter.drawSeparator(context, panelX + padding(), cursorY, panelW - padding() * 2, theme);
-                    cursorY += separatorH;
+                    if (sawAbilityContent) {
+                        TooltipPainter.drawSeparator(context, panelX + padding(), cursorY, panelW - padding() * 2, theme);
+                        cursorY += separatorH;
+                    }
                     context.drawText(tr,
                             Text.literal(headerText).setStyle(Style.EMPTY.withColor(
                                     TextColor.fromRgb(theme.sectionHeader() & 0x00FFFFFF))),
@@ -401,6 +421,9 @@ public class TooltipRenderer {
                                     TextColor.fromRgb(theme.body() & 0x00FFFFFF))),
                             panelX + padding(), cursorY, theme.body(), true);
                     cursorY += lineHeight;
+                    if (!line.trim().isEmpty()) {
+                        sawAbilityContent = true;
+                    }
                 }
             }
         }
@@ -531,14 +554,16 @@ public class TooltipRenderer {
                                     TextColor.fromRgb(theme.body() & 0x00FFFFFF))),
                             contentLeft, cursorY, theme.body(), true);
                 }
-                cursorY += lineHeight;
+                cursorY += statRowHeight(stat, lineHeight);
             }
         }
 
         // ---- Extra lines (enchantments, durability, etc.) ----
         if (hasExtra && drawStats) {
-            TooltipPainter.drawSeparator(context, panelX + padding(), cursorY, panelW - padding() * 2, theme);
-            cursorY += separatorH;
+            if (extraNeedsSeparator) {
+                TooltipPainter.drawSeparator(context, panelX + padding(), cursorY, panelW - padding() * 2, theme);
+                cursorY += separatorH;
+            }
             int extraColor = TooltipPainter.lerpColor(theme.body(), 0xFFB8C2CF, 0.30f);
             int contentLeft = panelX + padding();
             int contentRight = panelX + panelW - padding();
@@ -553,7 +578,7 @@ public class TooltipRenderer {
                                     TextColor.fromRgb(extraColor & 0x00FFFFFF))),
                             contentLeft, cursorY, extraColor, true);
                 }
-                cursorY += lineHeight;
+                cursorY += statRowHeight(stat, lineHeight);
             }
         }
 
@@ -731,6 +756,13 @@ public class TooltipRenderer {
             return TooltipPainter.lerpColor(red, orange, t / 0.5f);
         }
         return TooltipPainter.lerpColor(orange, green, (t - 0.5f) / 0.5f);
+    }
+
+    private static int statRowHeight(InlineStatRow stat, int lineHeight) {
+        if (stat != null && "Attack Range".equals(stat.label())) {
+            return lineHeight + 2;
+        }
+        return lineHeight;
     }
 
     private static int statRowMinWidth(TextRenderer tr, InlineStatRow stat) {
