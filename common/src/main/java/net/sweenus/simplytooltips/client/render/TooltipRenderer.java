@@ -102,7 +102,8 @@ public class TooltipRenderer {
         int sectionGap  = 4;
         int iconAreaW   = 36;
         int hintRowH    = (model.hint() != null) ? lineHeight + 2 : 0;
-        int headerH     = padding() + 16 + 6 + 12 + hintRowH + padding();
+        int headerBottomPad = Math.max(2, padding() - 8);
+        int headerH     = padding() + 16 + 6 + 12 + hintRowH + headerBottomPad;
         int separatorH  = 10;
 
         boolean hasAbility = !wrappedAbility.isEmpty();
@@ -303,8 +304,10 @@ public class TooltipRenderer {
         }
 
         if (model.hint() != null) {
-            int hintY = badgeY + tr.fontHeight + 2;
-            context.drawText(tr, model.hint(), nameX, hintY, theme.body(), false);
+            String hintText = model.hint().getString();
+            int hintX = panelX + panelW - padding() - 3 - tr.getWidth(hintText);
+            int hintY = panelY + headerH - tr.fontHeight + 2;
+            context.drawText(tr, model.hint(), hintX, hintY, theme.hint(), false);
         }
 
         cursorY = panelY + headerH;
