@@ -29,6 +29,7 @@ public class MotifRegistry {
         MOTIFS.put("soul",      new SoulMotif());
         MOTIFS.put("deepdark",  new DeepDarkMotif());
         MOTIFS.put("poison",    new PoisonMotif());
+        MOTIFS.put("ocean",     new OceanMotif());
     }
 
     /**

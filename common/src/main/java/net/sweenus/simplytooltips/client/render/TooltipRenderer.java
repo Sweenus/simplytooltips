@@ -685,6 +685,7 @@ public class TooltipRenderer {
             case TooltipBorderStyle.SOUL      -> "soul";
             case TooltipBorderStyle.DEEP_DARK -> "deepdark";
             case TooltipBorderStyle.POISON    -> "poison";
+            case TooltipBorderStyle.OCEAN     -> "ocean";
             default -> null;
         };
     }
@@ -707,6 +708,7 @@ public class TooltipRenderer {
             case "soul"      -> TooltipBorderStyle.SOUL;
             case "deepdark"  -> TooltipBorderStyle.DEEP_DARK;
             case "poison"    -> TooltipBorderStyle.POISON;
+            case "ocean"     -> TooltipBorderStyle.OCEAN;
             default          -> TooltipBorderStyle.DEFAULT;
         };
     }

@@ -1,6 +1,6 @@
 {
   "items": {
-    "minecraft:iron_sword":     { "theme": "poison",     "badges": ["SWORD", "IRON"] },
+    "minecraft:iron_sword":     { "theme": "ocean",     "badges": ["SWORD", "IRON"] },
     "minecraft:enchanted_book": { "theme": "enchanted", "badges": ["ENCHANT"]       },
 
     "simplyswords:watcher_claymore":     { "theme": "echo",      "badges": ["UNIQUE", "CLAYMORE"]   },
