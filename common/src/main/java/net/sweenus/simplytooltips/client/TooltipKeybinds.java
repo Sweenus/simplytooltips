@@ -21,5 +21,15 @@ public class TooltipKeybinds {
             CATEGORY
     );
 
+    /**
+     * Captures a 2-second looping GIF of the currently visible tooltip.
+     * Default key: {@code H}.
+     */
+    public static final KeyBinding CAPTURE_GIF = new KeyBinding(
+            "key.simplytooltips.capture_gif",
+            GLFW.GLFW_KEY_H,
+            CATEGORY
+    );
+
     private TooltipKeybinds() {}
 }

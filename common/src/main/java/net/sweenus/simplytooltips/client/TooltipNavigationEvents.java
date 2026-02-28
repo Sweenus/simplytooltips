@@ -1,8 +1,10 @@
 package net.sweenus.simplytooltips.client;
 
 import dev.architectury.event.EventResult;
+import dev.architectury.event.events.client.ClientTickEvent;
 import dev.architectury.event.events.client.ClientRawInputEvent;
 import net.sweenus.simplytooltips.client.render.TabState;
+import net.sweenus.simplytooltips.client.render.TooltipGifRecorder;
 import org.lwjgl.glfw.GLFW;
 
 /**
@@ -23,6 +25,12 @@ public class TooltipNavigationEvents {
         // Raw key press — fires at GLFW level before the screen handles input, so it works even
         // when an inventory screen is open (wasPressed() only fires when currentScreen == null).
         ClientRawInputEvent.KEY_PRESSED.register((client, keyCode, scanCode, action, modifiers) -> {
+            if (action == GLFW.GLFW_PRESS
+                    && TooltipKeybinds.CAPTURE_GIF.matchesKey(keyCode, scanCode)) {
+                TooltipGifRecorder.requestCapture();
+                return EventResult.interruptTrue();
+            }
+
             if (TooltipNavigationConfig.tooltipTabs()
                     && action == GLFW.GLFW_PRESS
                     && TooltipKeybinds.CYCLE_TAB.matchesKey(keyCode, scanCode)
@@ -32,6 +40,8 @@ public class TooltipNavigationEvents {
             }
             return EventResult.pass();
         });
+
+        ClientTickEvent.CLIENT_POST.register(client -> TooltipGifRecorder.tick());
     }
 
     private TooltipNavigationEvents() {}

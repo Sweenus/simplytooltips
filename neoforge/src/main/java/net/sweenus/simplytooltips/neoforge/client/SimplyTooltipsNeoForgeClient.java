@@ -25,6 +25,7 @@ public final class SimplyTooltipsNeoForgeClient {
     @SubscribeEvent
     public static void onRegisterKeyMappings(RegisterKeyMappingsEvent event) {
         event.register(TooltipKeybinds.CYCLE_TAB);
+        event.register(TooltipKeybinds.CAPTURE_GIF);
     }
 
     private SimplyTooltipsNeoForgeClient() {}

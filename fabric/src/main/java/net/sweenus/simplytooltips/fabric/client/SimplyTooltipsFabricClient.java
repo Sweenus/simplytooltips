@@ -45,5 +45,6 @@ public final class SimplyTooltipsFabricClient implements ClientModInitializer {
 
         TooltipNavigationEvents.register();
         KeyBindingHelper.registerKeyBinding(TooltipKeybinds.CYCLE_TAB);
+        KeyBindingHelper.registerKeyBinding(TooltipKeybinds.CAPTURE_GIF);
     }
 }

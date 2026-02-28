@@ -662,6 +662,7 @@ public class TooltipRenderer {
 
         // Record whether this frame had an active scroll region (used by MOUSE_SCROLLED to consume the event).
         ScrollState.setScrollableActive(scrollActive);
+        TooltipGifRecorder.markTooltipRendered(panelX, panelY, panelW, panelH);
 
         context.getMatrices().pop();
     }
