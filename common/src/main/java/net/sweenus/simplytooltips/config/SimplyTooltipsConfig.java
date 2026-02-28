@@ -25,6 +25,10 @@ public class SimplyTooltipsConfig extends Config {
         public ValidatedBoolean scrollableTooltip = new ValidatedBoolean(true);
         /** Split tooltip content into LORE / FORGE / STATS tabs; cycle with the keybind (default G). */
         public ValidatedBoolean tooltipTabs = new ValidatedBoolean(true);
+        /** If true, render Simply Tooltips for vanilla (minecraft namespace) items. */
+        public ValidatedBoolean applyTooltipsToVanillaItems = new ValidatedBoolean(false);
+        /** If true, render Simply Tooltips for all modded items; if false, only when a theme mapping exists. */
+        public ValidatedBoolean applyTooltipsToModItems = new ValidatedBoolean(false);
     }
 
     public static class LayoutSection extends ConfigSection {
@@ -33,7 +37,7 @@ public class SimplyTooltipsConfig extends Config {
         /** Extra vertical space (px) added between text lines. */
         public ValidatedInt lineSpacing = new ValidatedInt(1, 6, 0);
         /** Maximum text width (px) before body lines wrap. */
-        public ValidatedInt maxTextWidth = new ValidatedInt(200, 400, 80);
+        public ValidatedInt maxTextWidth = new ValidatedInt(160, 400, 80);
         /** Maximum body viewport height (px) before the scrollbar activates (~17 lines at default). */
         public ValidatedInt maxBodyHeight = new ValidatedInt(160, 400, 40);
     }

@@ -32,6 +32,14 @@ public class MotifRegistry {
         MOTIFS.put("ocean",     new OceanMotif());
         MOTIFS.put("rustic",    new RusticMotif());
         MOTIFS.put("honey",     new HoneyMotif());
+        MOTIFS.put("jade",      new JadeMotif());
+        MOTIFS.put("wood",      new WoodMotif());
+        MOTIFS.put("stone",     new StoneMotif());
+        MOTIFS.put("iron",      new IronMotif());
+        MOTIFS.put("gold",      new GoldMotif());
+        MOTIFS.put("diamond",   new DiamondMotif());
+        MOTIFS.put("netherite", new NetheriteMotif());
+        MOTIFS.put("runic",     new RunicMotif());
     }
 
     /**

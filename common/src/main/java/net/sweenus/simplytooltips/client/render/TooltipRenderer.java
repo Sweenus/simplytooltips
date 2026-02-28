@@ -689,6 +689,14 @@ public class TooltipRenderer {
             case TooltipBorderStyle.OCEAN     -> "ocean";
             case TooltipBorderStyle.RUSTIC    -> "rustic";
             case TooltipBorderStyle.HONEY     -> "honey";
+            case TooltipBorderStyle.JADE      -> "jade";
+            case TooltipBorderStyle.WOOD      -> "wood";
+            case TooltipBorderStyle.STONE     -> "stone";
+            case TooltipBorderStyle.IRON      -> "iron";
+            case TooltipBorderStyle.GOLD      -> "gold";
+            case TooltipBorderStyle.DIAMOND   -> "diamond";
+            case TooltipBorderStyle.NETHERITE -> "netherite";
+            case TooltipBorderStyle.RUNIC     -> "runic";
             default -> null;
         };
     }
@@ -714,6 +722,14 @@ public class TooltipRenderer {
             case "ocean"     -> TooltipBorderStyle.OCEAN;
             case "rustic"    -> TooltipBorderStyle.RUSTIC;
             case "honey"     -> TooltipBorderStyle.HONEY;
+            case "jade"      -> TooltipBorderStyle.JADE;
+            case "wood"      -> TooltipBorderStyle.WOOD;
+            case "stone"     -> TooltipBorderStyle.STONE;
+            case "iron"      -> TooltipBorderStyle.IRON;
+            case "gold"      -> TooltipBorderStyle.GOLD;
+            case "diamond"   -> TooltipBorderStyle.DIAMOND;
+            case "netherite" -> TooltipBorderStyle.NETHERITE;
+            case "runic"     -> TooltipBorderStyle.RUNIC;
             default          -> TooltipBorderStyle.DEFAULT;
         };
     }

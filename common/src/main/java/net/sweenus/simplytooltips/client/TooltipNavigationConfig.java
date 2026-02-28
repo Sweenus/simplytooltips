@@ -18,5 +18,15 @@ public class TooltipNavigationConfig {
         return SimplyTooltipsConfig.INSTANCE.general.tooltipTabs.get();
     }
 
+    /** @return {@code true} if vanilla (minecraft namespace) items should use Simply Tooltips. */
+    public static boolean applyTooltipsToVanillaItems() {
+        return SimplyTooltipsConfig.INSTANCE.general.applyTooltipsToVanillaItems.get();
+    }
+
+    /** @return {@code true} if all modded items should use Simply Tooltips. */
+    public static boolean applyTooltipsToModItems() {
+        return SimplyTooltipsConfig.INSTANCE.general.applyTooltipsToModItems.get();
+    }
+
     private TooltipNavigationConfig() {}
 }

@@ -12,6 +12,8 @@ import net.minecraft.screen.slot.Slot;
 import net.minecraft.text.Text;
 import net.sweenus.simplytooltips.api.TooltipProvider;
 import net.sweenus.simplytooltips.api.TooltipProviderRegistry;
+import net.sweenus.simplytooltips.client.TooltipNavigationConfig;
+import net.sweenus.simplytooltips.client.render.ItemThemeRegistry;
 import net.sweenus.simplytooltips.client.render.TooltipRenderer;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
@@ -34,6 +36,7 @@ public abstract class DrawContextMixin {
     private void simplytooltips$drawModernTooltip(TextRenderer textRenderer, ItemStack stack,
                                                   int x, int y, CallbackInfo ci) {
         if (stack == null || stack.isEmpty()) return;
+        if (!simplytooltips$shouldRenderFor(stack)) return;
 
         MinecraftClient client = MinecraftClient.getInstance();
         if (client == null) return;
@@ -79,6 +82,7 @@ public abstract class DrawContextMixin {
         String title = text.get(0).getString();
         ItemStack resolved = simplytooltips$findRealStack(client, title);
         if (resolved.isEmpty()) return;
+        if (!simplytooltips$shouldRenderFor(resolved)) return;
 
         Optional<TooltipProvider> provider = TooltipProviderRegistry.find(resolved);
         if (provider.isEmpty()) return;
@@ -139,5 +143,17 @@ public abstract class DrawContextMixin {
         }
 
         return ItemStack.EMPTY;
+    }
+
+    @Unique
+    private static boolean simplytooltips$shouldRenderFor(ItemStack stack) {
+        String namespace = Registries.ITEM.getId(stack.getItem()).getNamespace();
+        if ("minecraft".equals(namespace)) {
+            return TooltipNavigationConfig.applyTooltipsToVanillaItems();
+        }
+        if (TooltipNavigationConfig.applyTooltipsToModItems()) {
+            return true;
+        }
+        return ItemThemeRegistry.hasThemeForStack(stack);
     }
 }

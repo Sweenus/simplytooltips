@@ -461,6 +461,148 @@ public class BorderRenderer {
                 context.fill(x + 3, y + h - 4, x + 4, y + h - 3, nail);
                 context.fill(x + w - 4, y + h - 4, x + w - 3, y + h - 3, nail);
             }
+            case TooltipBorderStyle.WOOD -> {
+                int barkA = 0xFFB1804F;
+                int barkB = 0xFF7A5332;
+                int sap = 0xFFD7AD72;
+                for (int px = x + 9, i = 0; px < x + w - 10; px += 13, i++) {
+                    boolean flip = (i & 1) == 0;
+                    context.fill(px, y + 1, px + 3, y + 2, barkA);
+                    context.fill(px + 1, y + 2, px + 4, y + 3, barkB);
+                    context.fill(px + (flip ? 1 : 2), y + 1, px + (flip ? 2 : 3), y + 2, sap);
+                    context.fill(px, y + h - 3, px + 3, y + h - 2, barkA);
+                    context.fill(px - 1, y + h - 2, px + 2, y + h - 1, barkB);
+                    context.fill(px + (flip ? 0 : 1), y + h - 3, px + (flip ? 1 : 2), y + h - 2, sap);
+                }
+            }
+            case TooltipBorderStyle.STONE -> {
+                int chipA = 0xFF8D939E;
+                int chipB = 0xFF636A76;
+                int dust = 0xFFADB4C0;
+                for (int px = x + 8, i = 0; px < x + w - 9; px += 10, i++) {
+                    int wChunk = (i % 3 == 0) ? 3 : 2;
+                    context.fill(px, y + 1, px + wChunk, y + 2, chipA);
+                    context.fill(px + 1, y + 2, px + wChunk + 1, y + 3, chipB);
+                    context.fill(px, y + h - 3, px + wChunk, y + h - 2, chipA);
+                    context.fill(px - 1, y + h - 2, px + wChunk - 1, y + h - 1, chipB);
+                    if ((i % 4) == 1) {
+                        context.fill(px + 1, y + 1, px + 2, y + 2, dust);
+                        context.fill(px, y + h - 2, px + 1, y + h - 1, dust);
+                    }
+                }
+            }
+            case TooltipBorderStyle.IRON -> {
+                int steelA = 0xFFC4CDD8;
+                int steelB = 0xFF8893A1;
+                int glint = 0xFFEAF1FF;
+                for (int px = x + 9, i = 0; px < x + w - 10; px += 12, i++) {
+                    context.fill(px, y + 1, px + 3, y + 2, steelA);
+                    context.fill(px + 1, y + 2, px + 4, y + 3, steelB);
+                    context.fill(px, y + h - 3, px + 3, y + h - 2, steelA);
+                    context.fill(px - 1, y + h - 2, px + 2, y + h - 1, steelB);
+                    if ((i & 1) == 0) {
+                        context.fill(px + 2, y + 1, px + 3, y + 2, glint);
+                        context.fill(px, y + h - 2, px + 1, y + h - 1, glint);
+                    }
+                }
+            }
+            case TooltipBorderStyle.GOLD -> {
+                int goldA = 0xFFFFCB62;
+                int goldB = 0xFFCC9328;
+                int shine = 0xFFFFE8A4;
+                for (int px = x + 9, i = 0; px < x + w - 10; px += 12, i++) {
+                    context.fill(px, y + 1, px + 3, y + 2, goldA);
+                    context.fill(px + 1, y + 2, px + 4, y + 3, goldB);
+                    context.fill(px, y + h - 3, px + 3, y + h - 2, goldA);
+                    context.fill(px - 1, y + h - 2, px + 2, y + h - 1, goldB);
+                    if ((i % 3) == 1) {
+                        context.fill(px + 1, y, px + 2, y + 1, shine);
+                        context.fill(px + 2, y + h - 1, px + 3, y + h, shine);
+                    }
+                }
+            }
+            case TooltipBorderStyle.DIAMOND -> {
+                int diaA = 0xFF75E6F3;
+                int diaB = 0xFF35A6BA;
+                int flash = 0xFFCFFFFF;
+                for (int px = x + 10, i = 0; px < x + w - 10; px += 14, i++) {
+                    context.fill(px, y + 1, px + 2, y + 2, diaA);
+                    context.fill(px + 1, y + 2, px + 3, y + 3, diaB);
+                    context.fill(px + 1, y + 1, px + 2, y + 2, flash);
+                    context.fill(px, y + h - 3, px + 2, y + h - 2, diaA);
+                    context.fill(px - 1, y + h - 2, px + 1, y + h - 1, diaB);
+                    if ((i & 1) == 0) {
+                        context.fill(px + 2, y + 2, px + 3, y + 3, flash);
+                        context.fill(px - 1, y + h - 3, px, y + h - 2, flash);
+                    }
+                }
+            }
+            case TooltipBorderStyle.NETHERITE -> {
+                int alloyA = 0xFF6A6079;
+                int alloyB = 0xFF3C374A;
+                int glow = 0xFFB08EE0;
+                for (int px = x + 9, i = 0; px < x + w - 10; px += 12, i++) {
+                    context.fill(px, y + 1, px + 3, y + 2, alloyA);
+                    context.fill(px + 1, y + 2, px + 4, y + 3, alloyB);
+                    context.fill(px, y + h - 3, px + 3, y + h - 2, alloyA);
+                    context.fill(px - 1, y + h - 2, px + 2, y + h - 1, alloyB);
+                    if ((i % 4) == 0) {
+                        context.fill(px + 2, y + 1, px + 3, y + 2, glow);
+                        context.fill(px, y + h - 2, px + 1, y + h - 1, glow);
+                    }
+                }
+            }
+            case TooltipBorderStyle.RUNIC -> {
+                int runeA = 0xFFA793FF;
+                int runeB = 0xFF6D58C9;
+                int sigil = 0xFFE0D6FF;
+                for (int px = x + 10, i = 0; px < x + w - 10; px += 14, i++) {
+                    if ((i & 1) == 0) {
+                        context.fill(px, y + 1, px + 1, y + 4, runeA);
+                        context.fill(px + 1, y + 2, px + 3, y + 3, runeB);
+                        context.fill(px + 1, y + 1, px + 2, y + 2, sigil);
+                        context.fill(px, y + h - 4, px + 1, y + h - 1, runeA);
+                        context.fill(px - 1, y + h - 3, px + 1, y + h - 2, runeB);
+                    } else {
+                        context.fill(px, y + 2, px + 3, y + 3, runeA);
+                        context.fill(px + 1, y + 1, px + 2, y + 4, runeB);
+                        context.fill(px + 1, y + 2, px + 2, y + 3, sigil);
+                        context.fill(px, y + h - 3, px + 3, y + h - 2, runeA);
+                        context.fill(px + 1, y + h - 4, px + 2, y + h - 1, runeB);
+                    }
+                }
+            }
+            case TooltipBorderStyle.JADE -> {
+                int jadeA = 0xFF49A77B;
+                int jadeB = 0xFF2D7E5A;
+                int goldA = 0xFFE4BC5E;
+                int goldB = 0xFFFFE3A0;
+                int deep = 0xFF1F5A43;
+
+                for (int px = x + 9, i = 0; px < x + w - 10; px += 12, i++) {
+                    boolean flip = (i & 1) == 0;
+
+                    context.fill(px, y + 1, px + 3, y + 2, jadeA);
+                    context.fill(px + 1, y + 2, px + 4, y + 3, jadeB);
+                    context.fill(px + 1, y + 1, px + 2, y + 2, goldA);
+                    if (flip) context.fill(px + 2, y, px + 3, y + 1, goldB);
+
+                    context.fill(px, y + h - 3, px + 3, y + h - 2, jadeA);
+                    context.fill(px - 1, y + h - 2, px + 2, y + h - 1, jadeB);
+                    context.fill(px, y + h - 2, px + 1, y + h - 1, goldA);
+                    if (!flip) context.fill(px + 1, y + h - 1, px + 2, y + h, goldB);
+
+                    if ((i % 3) == 1) {
+                        context.fill(px + 4, y + 1, px + 5, y + 2, deep);
+                        context.fill(px - 3, y + h - 2, px - 2, y + h - 1, deep);
+                    }
+                }
+
+                context.fill(x + 3, y + 3, x + 5, y + 5, goldA);
+                context.fill(x + w - 5, y + 3, x + w - 3, y + 5, goldA);
+                context.fill(x + 3, y + h - 5, x + 5, y + h - 3, goldA);
+                context.fill(x + w - 5, y + h - 5, x + w - 3, y + h - 3, goldA);
+            }
             default -> {}
         }
     }

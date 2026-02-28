@@ -70,6 +70,11 @@ public final class ItemThemeRegistry {
         return resolveTagThemeForStack(stack);
     }
 
+    /** Returns {@code true} if the stack has a theme mapping via exact item id or tag. */
+    public static boolean hasThemeForStack(ItemStack stack) {
+        return resolveItemThemeForStack(stack) != null || resolveTagThemeForStack(stack) != null;
+    }
+
     /** Returns only an exact item-ID theme match, or {@code null}. */
     public static @Nullable String resolveItemThemeForStack(ItemStack stack) {
         if (stack == null || stack.isEmpty()) return null;
