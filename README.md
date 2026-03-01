@@ -1,112 +1,29 @@
-# Simply Tooltips: Data-Driven Theming Guide
+# Simply Tooltips: Theme Quick Guide
 
 
-If you are building your own theme pack, this README documents every data-driven surface currently available, including all built-in preset themes.
+## 1) Folder Layout
 
-## Quick Reference
+Put your files in a resource pack under the `simplytooltips` namespace.
 
-### Paths
-
-- Themes: `assets/simplytooltips/themes/*.json`
-- Item mappings: `assets/simplytooltips/item_themes/*.json`
-- Lang: `assets/simplytooltips/lang/<locale>.json`
-
-### Theme JSON Fields
-
-- Color keys (hex `0xAARRGGBB`):
-  - `border`, `borderInner`, `bgTop`, `bgBottom`, `name`, `badgeBg`, `badgeCutout`, `sectionHeader`, `body`, `separator`, `diamondFrame`, `diamondFrameInner`, `footerDot`, `stringColor`, `frameColor`, `runeColor`, `slotFilled`, `slotEmpty`, `hint`
-- Behavior keys:
-  - `motif`: `none`, `vine`, `ember`, `enchanted`, `bee`, `blossom`, `bubble`, `earth`, `echo`, `ice`, `lightning`, `autumn`, `soul`, `deepdark`, `poison`, `ocean`, `rustic`, `honey`, `jade`, `wood`, `stone`, `iron`, `gold`, `diamond`, `netherite`, `runic`
-  - `itemAnimStyle`: `breathe_spin_bob`, `spin`, `bob`, `breathe`, `static`
-  - `titleAnimStyle`: `wave`, `shimmer`, `pulse`, `flicker`, `shiver`, `quiver`, `breathe_spin_bob`, `drop_bounce`, `hinge_fall`, `obfuscate`, `static` (also accepts `shivering`)
-  - `itemBorderShape`: `diamond`, `square`, `circle`, `cross`, `none`
-  - `customTextKeys`: string array
-
-### Item Mapping JSON Forms
-
-```json
-{
-  "items": {
-    "minecraft:iron_sword": "lightning",
-    "minecraft:netherite_sword": { "theme": "lightning", "badges": ["SWORD", "NETHERITE"] }
-  },
-  "tags": [
-    { "tag": "minecraft:swords", "theme": "lightning", "badges": ["SWORD"] }
-  ]
-}
+```text
+your_resource_pack/
+  pack.mcmeta
+  assets/
+    simplytooltips/
+      themes/
+        my_theme.json
+      item_themes/
+        my_mappings.json
 ```
 
-### Theme Assignment Priority
+- `themes/*.json`: defines how a tooltip looks.
+- `item_themes/*.json`: maps items/tags to theme keys.
 
-1. Exact item mapping (`items`)
-2. Provider `themeKey`
-3. First matching tag mapping (`tags`)
-4. Rarity theme (`rarity_common`, `rarity_uncommon`, `rarity_rare`, `rarity_epic`)
-5. Internal fallback definition
+## 2) Create a Theme
 
-### Presets
+Create `assets/simplytooltips/themes/my_theme.json`.
 
-Preset themes and their motif and title animation styles.
-
-| Theme key | Motif | Title animation |
-|---|---|---|
-| `autumn` | `autumn` | `wave` |
-| `bee` | `bee` | `wave` |
-| `blossom` | `blossom` | `wave` |
-| `bubble` | `bubble` | `wave` |
-| `deepdark` | `deepdark` | `pulse` |
-| `default` | `none` | `static` |
-| `diamond` | `diamond` | `static` |
-| `earth` | `earth` | `wave` |
-| `echo` | `echo` | `wave` |
-| `ember` | `ember` | `pulse` |
-| `enchanted` | `enchanted` | `wave` |
-| `gold` | `gold` | `static` |
-| `honey` | `honey` | `wave` |
-| `ice` | `ice` | `wave` |
-| `iron` | `iron` | `static` |
-| `jade` | `jade` | `wave` |
-| `lightning` | `lightning` | `wave` |
-| `netherite` | `netherite` | `static` |
-| `obfuscated` | `runic` | `obfuscate` |
-| `ocean` | `ocean` | `wave` |
-| `poison` | `poison` | `wave` |
-| `rarity_common` | `none` | `static` |
-| `rarity_epic` | `none` | `wave` |
-| `rarity_rare` | `none` | `wave` |
-| `rarity_uncommon` | `none` | `static` |
-| `runic` | `runic` | `static` |
-| `rustic` | `rustic` | `static` |
-| `soul` | `soul` | `wave` |
-| `stone` | `stone` | `static` |
-| `unstable` | `autumn` | `hinge_fall` |
-| `vine` | `vine` | `wave` |
-| `wood` | `wood` | `static` |
-
-## Data-Driven Surfaces
-
-Simply Tooltips currently exposes these developer-facing data surfaces:
-
-1. Theme definitions (`assets/simplytooltips/themes/*.json`)
-2. Item and tag theme mappings (`assets/simplytooltips/item_themes/*.json`)
-3. Badge overrides (inside `item_themes/*.json`)
-4. Localization keys (`assets/simplytooltips/lang/*.json`)
-5. Runtime config toggles and layout values (fzzy_config-backed client config)
-
-All resource-pack JSON must use namespace `simplytooltips` to be discovered by the built-in loaders.
-
-## Where Files Live
-
-- Built-in themes: `common/src/main/resources/assets/simplytooltips/themes`
-- Built-in item mappings: `common/src/main/resources/assets/simplytooltips/item_themes`
-- Built-in lang file: `common/src/main/resources/assets/simplytooltips/lang/en_us.json`
-- Config schema source: `common/src/main/java/net/sweenus/simplytooltips/config/SimplyTooltipsConfig.java`
-
-## Theme Definition (`themes/*.json`)
-
-Each file name is the `theme key` (for example, `vine.json` -> `vine`).
-
-### JSON Schema
+Use this as a starter:
 
 ```json
 {
@@ -137,42 +54,62 @@ Each file name is the `theme key` (for example, `vine.json` -> `vine`).
 }
 ```
 
-### Color Field Notes
+Notes:
+- File name is the theme key (`my_theme.json` -> `my_theme`).
+- Color format is `0xAARRGGBB`.
+- Missing or bad values fall back to defaults.
 
-- Format: `0xAARRGGBB` string
-- Missing color field: falls back to built-in default palette value
-- Invalid hex value: falls back to built-in default palette value for that field
+## 3) Assign Theme to Items
 
-### Behavior Field Notes
+Create `assets/simplytooltips/item_themes/my_mappings.json`.
 
-- `motif`: background motif + border style selection
-- `itemAnimStyle`: animation for header item icon
-- `titleAnimStyle`: animation for tooltip title text
-- `itemBorderShape`: icon frame shape
-- `customTextKeys`: accepted/loaded list of translation keys
+```json
+{
+  "items": {
+    "minecraft:diamond_sword": "my_theme",
+    "minecraft:netherite_sword": {
+      "theme": "my_theme",
+      "badges": ["SWORD", "CUSTOM"]
+    }
+  },
+  "tags": [
+    {
+      "tag": "minecraft:swords",
+      "theme": "my_theme",
+      "badges": ["SWORD"]
+    }
+  ]
+}
+```
 
-### Valid Values
+How it resolves:
+- Exact item match in `items` wins.
+- If no exact item match, first matching `tags` entry is used.
 
-`motif` values:
+## 4) Available Preset Theme Elements
+
+These are the built-in values you can reuse in your own theme JSON.
+
+### `motif`
 
 - `none`
 - `vine`, `ember`, `enchanted`, `bee`, `blossom`, `bubble`, `earth`, `echo`, `ice`, `lightning`, `autumn`, `soul`, `deepdark`, `poison`, `ocean`, `rustic`, `honey`, `jade`, `wood`, `stone`, `iron`, `gold`, `diamond`, `netherite`, `runic`
 
-`itemAnimStyle` values:
+### `itemAnimStyle`
 
-- `breathe_spin_bob` (default)
+- `breathe_spin_bob`
 - `spin`
 - `bob`
 - `breathe`
 - `static`
 
-`titleAnimStyle` values:
+### `titleAnimStyle`
 
-- `wave` (default)
+- `wave`
 - `shimmer`
 - `pulse`
 - `flicker`
-- `shiver`
+- `shiver` (also accepts `shivering`)
 - `quiver`
 - `breathe_spin_bob`
 - `drop_bounce`
@@ -180,95 +117,23 @@ Each file name is the `theme key` (for example, `vine.json` -> `vine`).
 - `obfuscate`
 - `static`
 
-`itemBorderShape` values:
+### `itemBorderShape`
 
-- `diamond` (default)
+- `diamond`
 - `square`
 - `circle`
 - `cross`
 - `none`
 
-### Unknown or Missing Value Behavior
+## 5) Built-In Preset Theme Keys
 
-- Unknown `motif`: motif layer is skipped and border style falls back to default border pattern
-- Unknown `itemAnimStyle`: behaves as `breathe_spin_bob`
-- Unknown `titleAnimStyle`: behaves as `wave`
-- Unknown `itemBorderShape`: behaves as `diamond`
+Built-in theme keys you can reference directly:
 
-## Item and Tag Mapping (`item_themes/*.json`)
+- `autumn`, `bee`, `blossom`, `bubble`, `deepdark`, `default`, `diamond`, `earth`, `echo`, `ember`, `enchanted`, `gold`, `honey`, `ice`, `iron`, `jade`, `lightning`, `netherite`, `obfuscated`, `ocean`, `poison`, `rarity_common`, `rarity_epic`, `rarity_rare`, `rarity_uncommon`, `runic`, `rustic`, `soul`, `stone`, `unstable`, `vine`, `wood`
 
-These files map item IDs and tag IDs to theme keys and badge labels.
+## 6) Reload and Test
 
-### JSON Schema
-
-```json
-{
-  "items": {
-    "minecraft:iron_sword": "lightning",
-    "minecraft:netherite_sword": {
-      "theme": "lightning",
-      "badges": ["SWORD", "NETHERITE"]
-    }
-  },
-  "tags": [
-    {
-      "tag": "minecraft:swords",
-      "theme": "lightning",
-      "badges": ["SWORD"]
-    },
-    {
-      "tag": "c:ingots",
-      "badges": ["INGOT"]
-    }
-  ]
-}
-```
-
-### Mapping Rules
-
-- `items.<id>` can be:
-  - a string (theme key only)
-  - an object with optional `theme` and optional `badges`
-- `tags[]` entries require `tag`; `theme` and `badges` are optional
-- invalid item IDs or tag IDs are ignored
-- `badges` must be a non-empty string array to apply
-
-### Multi-File Merge Behavior
-
-For multiple files in `assets/simplytooltips/item_themes/`:
-
-- `items` mappings are merged; later entries overwrite prior entries for the same item ID
-- `tags` entries are appended; first matching tag entry wins at runtime
-
-## Runtime Theme Resolution Order
-
-For a given stack, theme resolution follows this order:
-
-1. Exact item mapping from `item_themes` (`items`)
-2. Provider-supplied `themeKey` (if present)
-3. First matching tag mapping from `item_themes` (`tags`)
-4. Rarity theme (`rarity_common`, `rarity_uncommon`, `rarity_rare`, `rarity_epic`)
-5. Registry fallback (`ThemeDefinition.defaultDefinition()`)
-
-Badge resolution order:
-
-1. Exact item badge override
-2. First matching tag badge override
-3. Provider/default badges
-
-Render gating behavior:
-
-- Vanilla items render only when `applyTooltipsToVanillaItems=true`
-- Modded items render when either:
-  - `applyTooltipsToModItems=true`, or
-  - item/tag mapping exists in `item_themes`
-
-## Built-In Item Mapping Preset
-
-- Built-in file: `common/src/main/resources/assets/simplytooltips/item_themes/defaults.json`
-- Includes:
-  - Vanilla material set mappings (`wood`, `stone`, `iron`, `gold`, `diamond`, `netherite`)
-  - Rarity/unique-style mappings for supported mod content
-  - Tag-based badge defaults (for common tag groups)
-
-Use this file as a reference for large mapping packs.
+- Reload resources in-game (`F3 + T`), then hover items.
+- If tooltips are not applying to your target items, check your client config flags:
+  - `general.applyTooltipsToVanillaItems`
+  - `general.applyTooltipsToModItems`
