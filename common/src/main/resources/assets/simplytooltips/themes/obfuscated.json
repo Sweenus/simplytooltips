@@ -20,7 +20,7 @@
   "hint":              "0xFFC9D0F4",
   "motif":             "runic",
   "itemAnimStyle":     "breathe_spin_bob",
-  "titleAnimStyle":    "static",
+  "titleAnimStyle":    "obfuscate",
   "itemBorderShape":   "diamond",
   "customTextKeys":    []
 }

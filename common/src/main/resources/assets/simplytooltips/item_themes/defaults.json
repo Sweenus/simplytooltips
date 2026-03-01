@@ -108,6 +108,13 @@
     "simplyswords:chompolotl":           { "theme": "bubble",    "badges": ["UNIQUE", "CHAKRAM"]    },
     "simplyswords:dreadtide":            { "theme": "bubble",    "badges": ["UNIQUE", "TWINBLADE"]  },
 
+    "simplyswords:contained_remnant":     { "theme": "autumn",         "badges": ["UPGRADE"] },
+    "simplyswords:tampered_remnant":      { "theme": "obfuscated",     "badges": ["UPGRADE"] },
+    "simplyswords:empowered_remnant":     { "theme": "autumn",         "badges": ["UPGRADE"] },
+    "simplyswords:netherfused_gem":       { "theme": "ember",          "badges": ["UPGRADE"] },
+    "simplyswords:runefused_gem":         { "theme": "runic",          "badges": ["UPGRADE"] },
+    "simplyswords:runic_tablet":          { "theme": "runic",          "badges": ["UPGRADE"] },
+
     "simplybows:upgrades/rune_etching_grace":               { "theme": "autumn",    "badges": ["UPGRADE"] },
     "simplybows:upgrades/rune_etching_pain":                { "theme": "autumn",    "badges": ["UPGRADE"] },
     "simplybows:upgrades/rune_etching_chaos":               { "theme": "autumn",    "badges": ["UPGRADE"] },
