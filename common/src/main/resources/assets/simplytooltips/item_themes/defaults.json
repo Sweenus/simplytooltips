@@ -119,8 +119,8 @@
     "simplybows:upgrades/rune_etching_pain":                { "theme": "autumn",    "badges": ["UPGRADE"] },
     "simplybows:upgrades/rune_etching_chaos":               { "theme": "autumn",    "badges": ["UPGRADE"] },
     "simplybows:upgrades/rune_etching_bounty":              { "theme": "autumn",    "badges": ["UPGRADE"] },
-    "simplybows:upgrades/upgrades/reinforced_bow_frame":    { "theme": "autumn",    "badges": ["UPGRADE"] },
-    "simplybows:upgrades/upgrades/enchanted_bow_string":    { "theme": "autumn",    "badges": ["UPGRADE"] }
+    "simplybows:upgrades/reinforced_bow_frame":             { "theme": "autumn",    "badges": ["UPGRADE"] },
+    "simplybows:upgrades/enchanted_bow_string":             { "theme": "autumn",    "badges": ["UPGRADE"] }
   },
   "tags": [
     { "tag": "minecraft:swords",    "badges": ["SWORD"]   },
@@ -151,9 +151,7 @@
     { "tag": "simplyswords:gold_gear",      "theme": "gold",        "badges": ["GOLD"]        },
     { "tag": "simplyswords:diamond_gear",   "theme": "diamond",     "badges": ["DIAMOND"]     },
     { "tag": "simplyswords:netherite_gear", "theme": "netherite",   "badges": ["NETHERITE"]   },
-    { "tag": "simplyswords:runic_gear",     "theme": "runic",       "badges": ["RUNIC"]       },
+    { "tag": "simplyswords:runic_gear",     "theme": "runic",       "badges": ["RUNIC"]       }
 
-    { "tag": "simplyswords:gems",           "badges": ["UPGRADE"] },
-    { "tag": "simplybows:upgrades",         "badges": ["UPGRADE"] }
   ]
 }

@@ -15,6 +15,7 @@ import net.sweenus.simplytooltips.api.TooltipProviderRegistry;
 import net.sweenus.simplytooltips.client.TooltipNavigationConfig;
 import net.sweenus.simplytooltips.client.render.ItemThemeRegistry;
 import net.sweenus.simplytooltips.client.render.TooltipRenderer;
+import net.sweenus.simplytooltips.client.tooltip.GenericTooltipProvider;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
@@ -36,7 +37,6 @@ public abstract class DrawContextMixin {
     private void simplytooltips$drawModernTooltip(TextRenderer textRenderer, ItemStack stack,
                                                   int x, int y, CallbackInfo ci) {
         if (stack == null || stack.isEmpty()) return;
-        if (!simplytooltips$shouldRenderFor(stack)) return;
 
         MinecraftClient client = MinecraftClient.getInstance();
         if (client == null) return;
@@ -48,6 +48,7 @@ public abstract class DrawContextMixin {
 
         Optional<TooltipProvider> provider = TooltipProviderRegistry.find(stack);
         if (provider.isEmpty()) return;
+        if (!simplytooltips$shouldRenderFor(stack, provider.get())) return;
 
         TooltipRenderer.render(
                 (DrawContext) (Object) this, textRenderer, stack, raw, provider.get(),
@@ -82,10 +83,10 @@ public abstract class DrawContextMixin {
         String title = text.get(0).getString();
         ItemStack resolved = simplytooltips$findRealStack(client, title);
         if (resolved.isEmpty()) return;
-        if (!simplytooltips$shouldRenderFor(resolved)) return;
 
         Optional<TooltipProvider> provider = TooltipProviderRegistry.find(resolved);
         if (provider.isEmpty()) return;
+        if (!simplytooltips$shouldRenderFor(resolved, provider.get())) return;
 
         TooltipRenderer.render(
                 (DrawContext) (Object) this, textRenderer, resolved, text, provider.get(),
@@ -146,7 +147,11 @@ public abstract class DrawContextMixin {
     }
 
     @Unique
-    private static boolean simplytooltips$shouldRenderFor(ItemStack stack) {
+    private static boolean simplytooltips$shouldRenderFor(ItemStack stack, TooltipProvider provider) {
+        if (!(provider instanceof GenericTooltipProvider)) {
+            return true;
+        }
+
         String namespace = Registries.ITEM.getId(stack.getItem()).getNamespace();
         if ("minecraft".equals(namespace)) {
             return TooltipNavigationConfig.applyTooltipsToVanillaItems();
