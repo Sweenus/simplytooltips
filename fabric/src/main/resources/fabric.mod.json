@@ -7,7 +7,7 @@
   "authors": [
     "Sweenus"
   ],
-  "license": "All-Rights-Reserved",
+  "license": "Timefall Development License 1.2",
   "environment": "*",
   "entrypoints": {
     "main": [

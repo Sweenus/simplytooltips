@@ -1,6 +1,6 @@
 modLoader = "javafml"
 loaderVersion = "[2,)"
-license = "All Rights Reserved"
+license = "Timefall Development License 1.2"
 
 [[mods]]
 modId = "simplytooltips"
