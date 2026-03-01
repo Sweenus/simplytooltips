@@ -125,6 +125,11 @@ These are the built-in values you can reuse in your own theme JSON.
 - `cross`
 - `none`
 
+### `customTextKeys`
+
+- Add translation keys (string array) in your theme JSON.
+- These lines render below the Description section, with a separator line.
+
 ## 5) Built-In Preset Theme Keys
 
 Built-in theme keys you can reference directly:

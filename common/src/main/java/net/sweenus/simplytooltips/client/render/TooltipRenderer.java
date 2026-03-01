@@ -96,6 +96,7 @@ public class TooltipRenderer {
         // ---- Text wrapping ----
         AbilitySectionData abilitySection = prepareAbilitySection(stack, model.abilityLines());
         List<String> wrappedAbility = TooltipPainter.wrapStrings(abilitySection.lines(), tr, maxTextWidth());
+        List<String> wrappedCustom = wrapCustomTextKeys(resolvedDef.customTextKeys(), tr, maxTextWidth());
         List<String> wrappedBody    = TooltipPainter.wrapStrings(model.bodyLines(), tr, maxTextWidth());
         List<InlineStatRow> bodyStats = new ArrayList<>(wrappedBody.size());
         for (String line : wrappedBody) {
@@ -116,7 +117,7 @@ public class TooltipRenderer {
 
         List<TabState.Tab> availableTabs = new ArrayList<>();
         if (TooltipNavigationConfig.tooltipTabs()) {
-            if (!wrappedAbility.isEmpty())                                    availableTabs.add(TabState.Tab.LORE);
+            if (!wrappedAbility.isEmpty() || !wrappedCustom.isEmpty())        availableTabs.add(TabState.Tab.LORE);
             if (model.upgradeSection() != null)                               availableTabs.add(TabState.Tab.FORGE);
             if (!wrappedBody.isEmpty() || !wrappedExtra.isEmpty())            availableTabs.add(TabState.Tab.STATS);
             TabState.notifyItem(itemId, availableTabs);
@@ -138,6 +139,7 @@ public class TooltipRenderer {
         int separatorH  = 10;
 
         boolean hasAbility = !wrappedAbility.isEmpty();
+        boolean hasCustom  = !wrappedCustom.isEmpty();
         boolean hasBody    = !wrappedBody.isEmpty();
         boolean hasExtra   = !wrappedExtra.isEmpty();
 
@@ -147,14 +149,20 @@ public class TooltipRenderer {
         boolean drawUpgradeSummary = hasUpgrade && splitBowUpgradeTabs && drawLore;
         boolean drawUpgradeRuneDetails = hasUpgrade && splitBowUpgradeTabs && drawForge;
         boolean drawUpgradeFull = hasUpgrade && !splitBowUpgradeTabs && drawForge;
+        boolean customNeedsSeparator = hasCustom && drawLore && hasAbility;
+        boolean loreUpgradeSeparator = drawLore && (hasAbility || hasCustom) && (drawUpgradeSummary || drawUpgradeFull);
+        boolean statsNeedsLoreSeparator =
+                ((drawLore && (hasAbility || hasCustom)) || drawUpgradeSummary || drawUpgradeRuneDetails || drawUpgradeFull)
+                        && hasBody && drawStats;
         boolean extraNeedsSeparator = hasExtra && drawStats && (
                 hasBody
-                        || (!tabsActive && (hasAbility || hasUpgrade))
+                        || (!tabsActive && (hasAbility || hasCustom || hasUpgrade))
         );
         List<String> wrappedRuneEffect = hasUpgrade
                 ? TooltipPainter.wrapStrings(upgradeSection.rune().effectLines(), tr, maxTextWidth())
                 : List.of();
         boolean hasBodyContent = (hasAbility && drawLore)
+                || (hasCustom && drawLore)
                 || drawUpgradeSummary
                 || drawUpgradeRuneDetails
                 || drawUpgradeFull
@@ -171,6 +179,9 @@ public class TooltipRenderer {
             String measured = s.startsWith(ModernTooltipModel.SECTION_MARKER)
                     ? "\u25C6 " + s.substring(ModernTooltipModel.SECTION_MARKER.length()) : s;
             textContentW = Math.max(textContentW, tr.getWidth(measured));
+        }
+        for (String s : wrappedCustom) {
+            textContentW = Math.max(textContentW, tr.getWidth(s));
         }
         for (int i = 0; i < wrappedBody.size(); i++) {
             InlineStatRow stat = bodyStats.get(i);
@@ -239,7 +250,11 @@ public class TooltipRenderer {
                 }
             }
         }
-        if (hasAbility && drawLore && (drawUpgradeSummary || drawUpgradeFull)) bodyH += separatorH;
+        if (hasCustom && drawLore) {
+            bodyH += customNeedsSeparator ? separatorH : 0;
+            bodyH += wrappedCustom.size() * lineHeight;
+        }
+        if (loreUpgradeSeparator) bodyH += separatorH;
         if (drawUpgradeFull) {
             bodyH += lineHeight + sectionGap;              // "◆ Upgrades" header
             bodyH += upgradeRowH;                          // Slots row
@@ -257,8 +272,7 @@ public class TooltipRenderer {
             bodyH += upgradeRowH;                          // Rune name row
             bodyH += wrappedRuneEffect.size() * lineHeight;
         }
-        if (((hasAbility && drawLore) || drawUpgradeSummary || drawUpgradeRuneDetails || drawUpgradeFull)
-                && hasBody && drawStats) {
+        if (statsNeedsLoreSeparator) {
             bodyH += separatorH;
         }
         if (hasBody && drawStats) {
@@ -447,8 +461,23 @@ public class TooltipRenderer {
             }
         }
 
-        // ---- Separator between ability and upgrades ----
-        if (hasAbility && drawLore && (drawUpgradeSummary || drawUpgradeFull)) {
+        // ---- Theme custom text section (below Description) ----
+        if (hasCustom && drawLore) {
+            if (customNeedsSeparator) {
+                TooltipPainter.drawSeparator(context, panelX + padding(), cursorY, panelW - padding() * 2, theme);
+                cursorY += separatorH;
+            }
+            for (String line : wrappedCustom) {
+                context.drawText(tr,
+                        Text.literal(line).setStyle(Style.EMPTY.withColor(
+                                TextColor.fromRgb(theme.body() & 0x00FFFFFF))),
+                        panelX + padding(), cursorY, theme.body(), true);
+                cursorY += lineHeight;
+            }
+        }
+
+        // ---- Separator between lore text and upgrades ----
+        if (loreUpgradeSeparator) {
             TooltipPainter.drawSeparator(context, panelX + padding(), cursorY, panelW - padding() * 2, theme);
             cursorY += separatorH;
         }
@@ -593,9 +622,8 @@ public class TooltipRenderer {
             }
         }
 
-        // ---- Separator between (ability/upgrades) and body ----
-        if (((hasAbility && drawLore) || drawUpgradeSummary || drawUpgradeRuneDetails || drawUpgradeFull)
-                && hasBody && drawStats) {
+        // ---- Separator between (lore/upgrades) and body ----
+        if (statsNeedsLoreSeparator) {
             TooltipPainter.drawSeparator(context, panelX + padding(), cursorY, panelW - padding() * 2, theme);
             cursorY += separatorH;
         }
@@ -772,6 +800,18 @@ public class TooltipRenderer {
             case EPIC     -> "rarity_epic";
             default       -> "rarity_common";
         };
+    }
+
+    private static List<String> wrapCustomTextKeys(List<String> customTextKeys, TextRenderer tr, int maxWidth) {
+        if (customTextKeys == null || customTextKeys.isEmpty()) return List.of();
+
+        List<String> wrapped = new ArrayList<>();
+        for (String key : customTextKeys) {
+            if (key == null || key.isBlank()) continue;
+            String resolved = Text.translatable(key).getString();
+            wrapped.addAll(TooltipPainter.wrapStrings(List.of(resolved), tr, maxWidth));
+        }
+        return wrapped;
     }
 
     private static InlineStatRow parseInlineStatRow(String line) {

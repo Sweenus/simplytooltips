@@ -66,7 +66,7 @@ public record ThemeDefinition(
 
         /**
          * Translation key strings resolved via {@code Text.translatable(key).getString()} at
-         * render time and inserted as extra lines after the body section.
+         * render time and inserted below the description section.
          */
         List<String> customTextKeys
 ) {
