@@ -148,6 +148,10 @@ public abstract class DrawContextMixin {
 
     @Unique
     private static boolean simplytooltips$shouldRenderFor(ItemStack stack, TooltipProvider provider) {
+        if (!TooltipNavigationConfig.tooltipRenderingEnabled()) {
+            return false;
+        }
+
         if (!(provider instanceof GenericTooltipProvider)) {
             return true;
         }

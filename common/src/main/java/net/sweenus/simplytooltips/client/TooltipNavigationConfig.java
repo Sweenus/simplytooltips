@@ -8,24 +8,31 @@ import net.sweenus.simplytooltips.config.SimplyTooltipsConfig;
  */
 public class TooltipNavigationConfig {
 
+    /** @return {@code true} if Simply Tooltips custom tooltip rendering is globally enabled. */
+    public static boolean tooltipRenderingEnabled() {
+        return SimplyTooltipsConfig.INSTANCE.enableTooltipRendering.get();
+    }
+
     /** @return {@code true} if mouse-wheel scrolling is enabled for tall tooltips. */
     public static boolean scrollableTooltip() {
-        return SimplyTooltipsConfig.INSTANCE.general.scrollableTooltip.get();
+        return tooltipRenderingEnabled() && SimplyTooltipsConfig.INSTANCE.general.scrollableTooltip.get();
     }
 
     /** @return {@code true} if content tabs (LORE / FORGE / STATS) are enabled. */
     public static boolean tooltipTabs() {
-        return SimplyTooltipsConfig.INSTANCE.general.tooltipTabs.get();
+        return tooltipRenderingEnabled() && SimplyTooltipsConfig.INSTANCE.general.tooltipTabs.get();
     }
 
     /** @return {@code true} if vanilla (minecraft namespace) items should use Simply Tooltips. */
     public static boolean applyTooltipsToVanillaItems() {
-        return SimplyTooltipsConfig.INSTANCE.general.applyTooltipsToVanillaItems.get();
+        return tooltipRenderingEnabled()
+                && SimplyTooltipsConfig.INSTANCE.general.applyTooltipsToVanillaItems.get();
     }
 
     /** @return {@code true} if all modded items should use Simply Tooltips. */
     public static boolean applyTooltipsToModItems() {
-        return SimplyTooltipsConfig.INSTANCE.general.applyTooltipsToModItems.get();
+        return tooltipRenderingEnabled()
+                && SimplyTooltipsConfig.INSTANCE.general.applyTooltipsToModItems.get();
     }
 
     private TooltipNavigationConfig() {}

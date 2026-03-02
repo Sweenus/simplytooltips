@@ -16,6 +16,9 @@ public class SimplyTooltipsConfig extends Config {
         super(Identifier.of("simplytooltips", "config"));
     }
 
+    /** Master switch for all Simply Tooltips custom tooltip rendering. */
+    public ValidatedBoolean enableTooltipRendering = new ValidatedBoolean(true);
+
     public GeneralSection   general   = new GeneralSection();
     public LayoutSection    layout    = new LayoutSection();
     public AnimationSection animation = new AnimationSection();

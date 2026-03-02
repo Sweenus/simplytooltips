@@ -140,5 +140,6 @@ Built-in theme keys you can reference directly:
 
 - Reload resources in-game (`F3 + T`), then hover items.
 - If tooltips are not applying to your target items, check your client config flags:
+  - `enableTooltipRendering`
   - `general.applyTooltipsToVanillaItems`
   - `general.applyTooltipsToModItems`
