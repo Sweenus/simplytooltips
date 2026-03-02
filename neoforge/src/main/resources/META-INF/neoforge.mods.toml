@@ -8,8 +8,9 @@ version = "${version}"
 displayName = "Simply Tooltips"
 authors = "Sweenus"
 description = '''
-Standalone modern tooltip renderer for Simply mods. Optionally available for other vanilla and modded items.
+Modern data driven tooltip renderer for Simply mods. Optionally available for other vanilla and modded items.
 '''
+logoFile = "assets/simplytooltips/icon.png"
 
 [[dependencies.simplytooltips]]
 modId = "neoforge"

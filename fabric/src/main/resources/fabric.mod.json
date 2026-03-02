@@ -8,6 +8,7 @@
     "Sweenus"
   ],
   "license": "Timefall Development License 1.2",
+  "icon": "assets/simplytooltips/icon.gif",
   "environment": "*",
   "entrypoints": {
     "main": [
