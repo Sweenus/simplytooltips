@@ -26,6 +26,7 @@
     "minecraft": "~1.21.1",
     "java": ">=21",
     "architectury": ">=13.0.8",
+    "fzzy_config": ">=0.6.6",
     "fabric-api": "*"
   }
 }

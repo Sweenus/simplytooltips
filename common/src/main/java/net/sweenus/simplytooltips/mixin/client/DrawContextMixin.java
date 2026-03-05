@@ -5,11 +5,13 @@ import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.screen.ingame.HandledScreen;
+import net.minecraft.client.gui.screen.ingame.MerchantScreen;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.registry.Registries;
 import net.minecraft.screen.slot.Slot;
 import net.minecraft.text.Text;
+import net.minecraft.village.TradeOffer;
 import net.sweenus.simplytooltips.api.TooltipProvider;
 import net.sweenus.simplytooltips.api.TooltipProviderRegistry;
 import net.sweenus.simplytooltips.client.TooltipNavigationConfig;
@@ -22,13 +24,20 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
+import java.lang.reflect.Field;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Mixin(DrawContext.class)
 public abstract class DrawContextMixin {
 
     @Unique private static ItemStack simplytooltips$lastRealStack = ItemStack.EMPTY;
+
+    @Unique private static Field simplytooltips$cachedFocusedSlotField = null;
+    @Unique private static boolean simplytooltips$focusedSlotFieldResolved = false;
+    @Unique private static final Map<String, ItemStack> simplytooltips$nameToStackCache = new HashMap<>();
 
     // --- Injection points ---
 
@@ -98,25 +107,25 @@ public abstract class DrawContextMixin {
     private static ItemStack simplytooltips$findRealStack(MinecraftClient client, String title) {
         if (title == null || title.isBlank()) return ItemStack.EMPTY;
 
-        // 1. Cached stack from drawItemTooltip
         if (!simplytooltips$lastRealStack.isEmpty()
                 && simplytooltips$lastRealStack.getName().getString().equals(title)) {
             return simplytooltips$lastRealStack;
         }
 
-        // 2. Focused slot in a handled screen
         if (client.currentScreen instanceof HandledScreen<?> handledScreen) {
             try {
-                java.lang.reflect.Field focusedSlotField = null;
-                for (java.lang.reflect.Field f : HandledScreen.class.getDeclaredFields()) {
-                    if (f.getType() == Slot.class) {
-                        focusedSlotField = f;
-                        break;
+                if (!simplytooltips$focusedSlotFieldResolved) {
+                    for (Field f : HandledScreen.class.getDeclaredFields()) {
+                        if (f.getType() == Slot.class) {
+                            f.setAccessible(true);
+                            simplytooltips$cachedFocusedSlotField = f;
+                            break;
+                        }
                     }
+                    simplytooltips$focusedSlotFieldResolved = true;
                 }
-                if (focusedSlotField != null) {
-                    focusedSlotField.setAccessible(true);
-                    Slot slot = (Slot) focusedSlotField.get(handledScreen);
+                if (simplytooltips$cachedFocusedSlotField != null) {
+                    Slot slot = (Slot) simplytooltips$cachedFocusedSlotField.get(handledScreen);
                     if (slot != null && slot.hasStack()) {
                         ItemStack slotStack = slot.getStack();
                         if (slotStack.getName().getString().equals(title)) {
@@ -127,7 +136,7 @@ public abstract class DrawContextMixin {
             } catch (Throwable ignored) {}
         }
 
-        // 3. Cursor stack
+        // 3. Cursor / held stack
         if (client.player != null) {
             ItemStack cursorStack = client.player.currentScreenHandler.getCursorStack();
             if (!cursorStack.isEmpty() && cursorStack.getName().getString().equals(title)) {
@@ -135,10 +144,22 @@ public abstract class DrawContextMixin {
             }
         }
 
-        // 4. Registry scan (no component data)
+        if (client.currentScreen instanceof MerchantScreen merchantScreen) {
+            for (TradeOffer offer : merchantScreen.getScreenHandler().getRecipes()) {
+                ItemStack sellItem = offer.getSellItem();
+                if (!sellItem.isEmpty() && sellItem.getName().getString().equals(title)) {
+                    return sellItem;
+                }
+            }
+        }
+
+        ItemStack cached = simplytooltips$nameToStackCache.get(title);
+        if (cached != null) return cached;
+
         for (Item item : Registries.ITEM) {
             ItemStack candidate = new ItemStack(item);
             if (candidate.getName().getString().equals(title)) {
+                simplytooltips$nameToStackCache.put(title, candidate);
                 return candidate;
             }
         }
