@@ -7,7 +7,6 @@ import net.minecraft.component.type.AttributeModifiersComponent;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.registry.Registries;
-import net.minecraft.registry.RegistryKeys;
 import net.minecraft.registry.tag.TagKey;
 import net.minecraft.text.Style;
 import net.minecraft.text.Text;
@@ -19,6 +18,7 @@ import net.sweenus.simplytooltips.api.*;
 import net.sweenus.simplytooltips.client.TooltipKeybinds;
 import net.sweenus.simplytooltips.client.TooltipNavigationConfig;
 import net.sweenus.simplytooltips.client.render.motif.BackgroundMotif;
+import net.sweenus.simplytooltips.client.tooltip.SimplySwordsCompatTooltipProvider;
 import net.sweenus.simplytooltips.config.SimplyTooltipsConfig;
 
 import java.util.ArrayList;
@@ -36,13 +36,15 @@ public class TooltipRenderer {
             "^\\s*([+-]?\\d+(?:\\.\\d+)?)\\s+(Attack Damage|Attack Speed|Attack Range)\\s*$",
             Pattern.CASE_INSENSITIVE
     );
-    private static final Pattern SS_UNIQUE_EFFECT_PATTERN = Pattern.compile(
+    private static final Pattern UNIQUE_EFFECT_PATTERN = Pattern.compile(
             "(?i)^.*?unique\\s+effect\\s*:\\s*(.+?)\\s*$"
     );
     private static final String DEFAULT_ABILITY_HEADER = "Description";
-    private static final TagKey<Item> SIMPLYSWORDS_UNIQUES_TAG = TagKey.of(
-            RegistryKeys.ITEM, Identifier.of("simplyswords", "uniques")
-    );
+    // Tag used to drive the full Simply Swords rendering pipeline (ability header extraction,
+    // LORE tab, STATS tab with stat bars). Defined on the provider; referenced here for
+    // prepareAbilitySection. See SimplySwordsCompatTooltipProvider for full details.
+    private static final TagKey<Item> SIMPLY_SWORDS_COMPAT_TAG =
+            SimplySwordsCompatTooltipProvider.SIMPLY_SWORDS_COMPAT_TAG;
     private static final String STAT_LABEL_REFERENCE = "Attack Damage";
     private static final int STAT_BAR_MIN_WIDTH = 52;
     private static final int STAT_BAR_HEIGHT = 4;
@@ -916,8 +918,7 @@ public class TooltipRenderer {
         List<String> lines = new ArrayList<>(abilityLines);
         String header = DEFAULT_ABILITY_HEADER;
 
-        Identifier id = Registries.ITEM.getId(stack.getItem());
-        if (id == null || !"simplyswords".equals(id.getNamespace()) || !stack.isIn(SIMPLYSWORDS_UNIQUES_TAG)) {
+        if (!stack.isIn(SIMPLY_SWORDS_COMPAT_TAG)) {
             return new AbilitySectionData(header, lines);
         }
 
@@ -930,7 +931,7 @@ public class TooltipRenderer {
                     : raw;
             content = content.replace('\u00A0', ' ').trim();
 
-            Matcher matcher = SS_UNIQUE_EFFECT_PATTERN.matcher(content);
+            Matcher matcher = UNIQUE_EFFECT_PATTERN.matcher(content);
             if (!matcher.matches()) continue;
 
             String abilityName = matcher.group(1).trim();

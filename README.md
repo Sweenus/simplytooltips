@@ -143,3 +143,40 @@ Built-in theme keys you can reference directly:
   - `enableTooltipRendering`
   - `general.applyTooltipsToVanillaItems`
   - `general.applyTooltipsToModItems`
+
+## 7) Addon Mod Integration: Simply Swords Compat
+
+If your mod adds items that follow the Simply Swords tooltip structure, you can
+opt them into the full Simply Swords rendering pipeline with a single data file.
+
+**What tagged items receive:**
+- **LORE tab** — ability description lines are separated from stats and rendered
+  with a `◆ <AbilityName>` section header. The name is extracted automatically
+  from the `Unique Effect: <Name>` line.
+- **Action-label sub-headers** — lines such as `On Right Click:` are detected
+  and rendered as `◆` sub-section headers with a visual separator above them.
+- **STATS tab with stat bars** — the mainhand Attack Damage / Attack Speed /
+  Attack Range block is pulled into the STATS tab and rendered as graphical
+  progress bars.
+- **Button-hint row** — the interactive hint line (info / search / config
+  glyphs) is extracted and placed in the header area.
+
+Badges and themes are **not** auto-detected by this tag. Assign them via
+`assets/simplytooltips/item_themes/` as described in sections 2–3.
+
+Create `data/simplytooltips/tags/item/simply_swords_compat.json` inside your
+mod's resources:
+
+```json
+{
+  "values": [
+    "yourmod:your_unique_item",
+    "#yourmod:your_uniques_tag"
+  ]
+}
+```
+
+> **Priority note:** `SimplySwordsCompatTooltipProvider` is registered at
+> priority `1`. If your mod registers its own `TooltipProvider` at a higher
+> priority for the same items, that provider takes precedence and this tag has
+> no effect for those items.
