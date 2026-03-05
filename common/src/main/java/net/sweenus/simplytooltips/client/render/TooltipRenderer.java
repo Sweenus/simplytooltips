@@ -4,6 +4,8 @@ import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.component.type.AttributeModifiersComponent;
+import net.minecraft.entity.effect.StatusEffect;
+import net.minecraft.entity.effect.StatusEffectCategory;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.registry.Registries;
@@ -18,11 +20,14 @@ import net.sweenus.simplytooltips.api.*;
 import net.sweenus.simplytooltips.client.TooltipKeybinds;
 import net.sweenus.simplytooltips.client.TooltipNavigationConfig;
 import net.sweenus.simplytooltips.client.render.motif.BackgroundMotif;
+import net.sweenus.simplytooltips.client.tooltip.ApotheosisCompat;
 import net.sweenus.simplytooltips.client.tooltip.SimplySwordsCompatTooltipProvider;
 import net.sweenus.simplytooltips.config.SimplyTooltipsConfig;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -33,7 +38,7 @@ import java.util.regex.Pattern;
 public class TooltipRenderer {
 
     private static final Pattern INLINE_STAT_PATTERN = Pattern.compile(
-            "^\\s*([+-]?\\d+(?:\\.\\d+)?)\\s+(Attack Damage|Attack Speed|Attack Range)\\s*$",
+            "^\\s*([+-]?\\d+(?:\\.\\d+)?)\\s+(Attack Damage|Attack Speed|Attack Range|Entity Interaction Range)\\s*$",
             Pattern.CASE_INSENSITIVE
     );
     private static final Pattern UNIQUE_EFFECT_PATTERN = Pattern.compile(
@@ -48,6 +53,27 @@ public class TooltipRenderer {
     private static final String STAT_LABEL_REFERENCE = "Attack Damage";
     private static final int STAT_BAR_MIN_WIDTH = 52;
     private static final int STAT_BAR_HEIGHT = 4;
+
+    /** Extra vertical gap added after each body / extra / affix content line (not section headers). */
+    private static final int BODY_LINE_EXTRA_GAP = 2;
+
+    /** Height consumed by an {@link ModernTooltipModel#AFFIX_DIVIDER} sentinel in the AFFIXES tab. */
+    private static final int AFFIX_DIVIDER_H = 7;
+
+    /**
+     * Minimum scale at which the title is rendered before switching to truncation with "...".
+     * Below this threshold the text would be unreadably small, so the string is clipped instead.
+     */
+    private static final float MIN_TITLE_SCALE = 0.6f;
+
+    /** Regex used to split a body-line string into numeric and non-numeric segments for colour highlighting. */
+    private static final Pattern NUMBER_SEGMENT_PATTERN = Pattern.compile("(\\d+(?:[.,]\\d+)?)");
+
+    private static final int AFFIX_POSITIVE_COLOR = 0xFF6FCB63;
+    private static final int AFFIX_NEGATIVE_COLOR = 0xFFD05A4A;
+    private static final int AFFIX_NEUTRAL_COLOR  = 0xFFB8742F;
+    private static volatile List<EffectNameEntry> STATUS_EFFECT_ENTRIES;
+
 
     private static int padding()      { return SimplyTooltipsConfig.INSTANCE.layout.padding.get(); }
     private static int lineSpacing()  { return SimplyTooltipsConfig.INSTANCE.layout.lineSpacing.get(); }
@@ -78,6 +104,9 @@ public class TooltipRenderer {
         try { altDown = Screen.hasAltDown(); } catch (Throwable ignored) {}
 
         ModernTooltipModel model = provider.build(stack, rawLines, altDown);
+        // Post-process: move Apotheosis affix/imbue lines to the STATS tab bodyLines
+        // under a dedicated "Affixes" section header, regardless of which provider ran.
+        model = ApotheosisCompat.augment(model, rawLines, stack, altDown);
 
         // Resolve theme via priority chain: provider key > item/tag data > rarity
         ThemeDefinition resolvedDef      = resolveTheme(stack, model);
@@ -97,9 +126,13 @@ public class TooltipRenderer {
 
         // ---- Text wrapping ----
         AbilitySectionData abilitySection = prepareAbilitySection(stack, model.abilityLines());
-        List<String> wrappedAbility = TooltipPainter.wrapStrings(abilitySection.lines(), tr, maxTextWidth());
-        List<String> wrappedCustom = wrapCustomTextKeys(resolvedDef.customTextKeys(), tr, maxTextWidth());
-        List<String> wrappedBody    = TooltipPainter.wrapStrings(model.bodyLines(), tr, maxTextWidth());
+        List<String> wrappedAbility  = TooltipPainter.wrapStrings(abilitySection.lines(), tr, maxTextWidth());
+        List<String> wrappedCustom   = wrapCustomTextKeys(resolvedDef.customTextKeys(), tr, maxTextWidth());
+        List<String> wrappedBody     = TooltipPainter.wrapStrings(model.bodyLines(), tr, maxTextWidth());
+        List<String> wrappedAffixes  = model.affixLines() != null
+                ? wrapAffixStrings(model.affixLines(), tr, maxTextWidth())
+                : List.of();
+        wrappedAffixes = filterBracketOnlyAffixLines(wrappedAffixes, altDown);
         List<InlineStatRow> bodyStats = new ArrayList<>(wrappedBody.size());
         for (String line : wrappedBody) {
             bodyStats.add(parseInlineStatRow(line));
@@ -112,6 +145,7 @@ public class TooltipRenderer {
         for (String line : wrappedExtra) {
             extraStats.add(parseInlineStatRow(line));
         }
+        int statValueColumnW = inlineStatValueColumnWidth(tr, bodyStats, extraStats);
 
         // ---- Tab and scroll state ----
         Identifier itemId = Registries.ITEM.getId(stack.getItem());
@@ -122,13 +156,15 @@ public class TooltipRenderer {
             if (!wrappedAbility.isEmpty() || !wrappedCustom.isEmpty())        availableTabs.add(TabState.Tab.LORE);
             if (model.upgradeSection() != null)                               availableTabs.add(TabState.Tab.FORGE);
             if (!wrappedBody.isEmpty() || !wrappedExtra.isEmpty())            availableTabs.add(TabState.Tab.STATS);
+            if (!wrappedAffixes.isEmpty())                                    availableTabs.add(TabState.Tab.AFFIXES);
             TabState.notifyItem(itemId, availableTabs);
         }
 
-        boolean tabsActive = TooltipNavigationConfig.tooltipTabs() && TabState.multiTab();
-        boolean drawLore   = !tabsActive || TabState.activeTab() == TabState.Tab.LORE;
-        boolean drawForge  = !tabsActive || TabState.activeTab() == TabState.Tab.FORGE;
-        boolean drawStats  = !tabsActive || TabState.activeTab() == TabState.Tab.STATS;
+        boolean tabsActive   = TooltipNavigationConfig.tooltipTabs() && TabState.multiTab();
+        boolean drawLore     = !tabsActive || TabState.activeTab() == TabState.Tab.LORE;
+        boolean drawForge    = !tabsActive || TabState.activeTab() == TabState.Tab.FORGE;
+        boolean drawStats    = !tabsActive || TabState.activeTab() == TabState.Tab.STATS;
+        boolean drawAffixes  = !tabsActive || TabState.activeTab() == TabState.Tab.AFFIXES;
 
         // ---- Layout ----
         int lineHeight  = tr.fontHeight + lineSpacing();
@@ -163,16 +199,22 @@ public class TooltipRenderer {
         List<String> wrappedRuneEffect = hasUpgrade
                 ? TooltipPainter.wrapStrings(upgradeSection.rune().effectLines(), tr, maxTextWidth())
                 : List.of();
+        boolean hasAffixes    = !wrappedAffixes.isEmpty();
         boolean hasBodyContent = (hasAbility && drawLore)
                 || (hasCustom && drawLore)
                 || drawUpgradeSummary
                 || drawUpgradeRuneDetails
                 || drawUpgradeFull
-                || ((hasBody || hasExtra) && drawStats);
+                || ((hasBody || hasExtra) && drawStats)
+                || (hasAffixes && drawAffixes);
 
         // Panel width
         int textContentW = 0;
-        textContentW = Math.max(textContentW, tr.getWidth(model.title()) + iconAreaW + 4);
+        // Cap title contribution so a long Apotheosis-renamed item doesn't widen the panel beyond
+        // maxTextWidth(). The rendering step scales the title down (or truncates) to fit.
+        textContentW = Math.max(textContentW,
+                Math.min(tr.getWidth(model.title()) + iconAreaW + 4,
+                         maxTextWidth()));
         if (!wrappedAbility.isEmpty()) {
             textContentW = Math.max(textContentW, tr.getWidth("\u25C6 " + abilitySection.header()));
         }
@@ -186,21 +228,38 @@ public class TooltipRenderer {
             textContentW = Math.max(textContentW, tr.getWidth(s));
         }
         for (int i = 0; i < wrappedBody.size(); i++) {
-            InlineStatRow stat = bodyStats.get(i);
-            if (stat != null) {
-                int statW = statRowMinWidth(tr, stat);
-                textContentW = Math.max(textContentW, statW);
+            String bodyLine = wrappedBody.get(i);
+            if (bodyLine.startsWith(ModernTooltipModel.SECTION_MARKER)) {
+                // Measure as "◆ Label" — the actual rendered text — not the raw SECTION_MARKER string.
+                String measured = "\u25C6 " + bodyLine.substring(ModernTooltipModel.SECTION_MARKER.length());
+                textContentW = Math.max(textContentW, tr.getWidth(measured));
             } else {
-                textContentW = Math.max(textContentW, tr.getWidth(wrappedBody.get(i)));
+                InlineStatRow stat = bodyStats.get(i);
+                if (stat != null) {
+                    int statW = statRowMinWidth(tr, stat, statValueColumnW);
+                    textContentW = Math.max(textContentW, statW);
+                } else {
+                    textContentW = Math.max(textContentW, tr.getWidth(bodyLine));
+                }
             }
         }
         for (int i = 0; i < wrappedExtra.size(); i++) {
             InlineStatRow stat = extraStats.get(i);
             if (stat != null) {
-                int statW = statRowMinWidth(tr, stat);
+                int statW = statRowMinWidth(tr, stat, statValueColumnW);
                 textContentW = Math.max(textContentW, statW);
             } else {
                 textContentW = Math.max(textContentW, tr.getWidth(wrappedExtra.get(i)));
+            }
+        }
+        for (String affixLine : wrappedAffixes) {
+            if (affixLine.equals(ModernTooltipModel.AFFIX_DIVIDER)) {
+                // zero width contribution — just a visual divider
+            } else if (affixLine.startsWith(ModernTooltipModel.SECTION_MARKER)) {
+                String measured = "\u25C6 " + affixLine.substring(ModernTooltipModel.SECTION_MARKER.length());
+                textContentW = Math.max(textContentW, tr.getWidth(measured));
+            } else {
+                textContentW = Math.max(textContentW, tr.getWidth(affixLine));
             }
         }
 
@@ -278,14 +337,34 @@ public class TooltipRenderer {
             bodyH += separatorH;
         }
         if (hasBody && drawStats) {
-            for (InlineStatRow stat : bodyStats) {
-                bodyH += statRowHeight(stat, lineHeight);
+            for (int i = 0; i < wrappedBody.size(); i++) {
+                if (wrappedBody.get(i).startsWith(ModernTooltipModel.SECTION_MARKER)) {
+                    bodyH += lineHeight + sectionGap;
+                } else {
+                    bodyH += statRowHeight(bodyStats.get(i), lineHeight) + BODY_LINE_EXTRA_GAP;
+                }
             }
         }
         if (hasExtra && drawStats) {
             bodyH += extraNeedsSeparator ? separatorH : 0;
             for (InlineStatRow stat : extraStats) {
-                bodyH += statRowHeight(stat, lineHeight);
+                bodyH += statRowHeight(stat, lineHeight) + BODY_LINE_EXTRA_GAP;
+            }
+        }
+        if (hasAffixes && drawAffixes) {
+            boolean sawAffixContent = false;
+            for (int i = 0; i < wrappedAffixes.size(); i++) {
+                String line = wrappedAffixes.get(i);
+                if (line.startsWith(ModernTooltipModel.SECTION_MARKER)) {
+                    bodyH += (sawAffixContent ? separatorH : 0) + lineHeight + sectionGap;
+                } else if (line.equals(ModernTooltipModel.AFFIX_DIVIDER)) {
+                    bodyH += AFFIX_DIVIDER_H;
+                } else {
+                    boolean nextIsDivider = i + 1 < wrappedAffixes.size()
+                            && wrappedAffixes.get(i + 1).equals(ModernTooltipModel.AFFIX_DIVIDER);
+                    bodyH += lineHeight + (nextIsDivider ? 0 : BODY_LINE_EXTRA_GAP);
+                    if (!line.trim().isEmpty()) sawAffixContent = true;
+                }
             }
         }
 
@@ -375,26 +454,44 @@ public class TooltipRenderer {
         // ---- Header: title + badges ----
         int nameX = panelX + padding() + iconAreaW;
         int nameY = cursorY + 4;
+
+        // Scale the title down proportionally if it is wider than the available header space.
+        // At MIN_TITLE_SCALE the string is truncated with "..." to avoid unreadably small text.
+        int availTitleW = panelW - padding() - iconAreaW - padding() - 4;
+        float titleScale = Math.min(1.0f, (float) availTitleW / Math.max(1, tr.getWidth(model.title())));
+        String displayTitle = model.title();
+        if (titleScale < MIN_TITLE_SCALE) {
+            titleScale = MIN_TITLE_SCALE;
+            int maxTitlePixelW = (int) (availTitleW / MIN_TITLE_SCALE);
+            displayTitle = truncateTitleToWidth(tr, model.title(), maxTitlePixelW);
+        }
+        if (titleScale < 1.0f) {
+            context.getMatrices().push();
+            context.getMatrices().translate(nameX, nameY, 0);
+            context.getMatrices().scale(titleScale, titleScale, 1.0f);
+            context.getMatrices().translate(-nameX, -nameY, 0);
+        }
         switch (titleAnimStyle != null ? titleAnimStyle : "wave") {
-            case "shimmer" -> TooltipPainter.drawShimmerText(context, tr, model.title(), nameX, nameY, theme.name(), iconTimeMs);
-            case "pulse"   -> TooltipPainter.drawPulseText(context, tr, model.title(), nameX, nameY, theme.name(), iconTimeMs);
-            case "flicker" -> TooltipPainter.drawFlickerText(context, tr, model.title(), nameX, nameY, theme.name(), iconTimeMs);
-            case "shiver", "shivering" -> TooltipPainter.drawShiverText(context, tr, model.title(), nameX, nameY, theme.name(), iconTimeMs);
-            case "quiver"  -> TooltipPainter.drawQuiverText(context, tr, model.title(), nameX, nameY, theme.name(), iconTimeMs);
-            case "breathe_spin_bob" -> TooltipPainter.drawBreatheSpinBobText(context, tr, model.title(), nameX, nameY, theme.name(), iconTimeMs);
-            case "drop_bounce" -> TooltipPainter.drawDropBounceText(context, tr, model.title(), nameX, nameY, theme.name(), tooltipElapsedMs);
+            case "shimmer" -> TooltipPainter.drawShimmerText(context, tr, displayTitle, nameX, nameY, theme.name(), iconTimeMs);
+            case "pulse"   -> TooltipPainter.drawPulseText(context, tr, displayTitle, nameX, nameY, theme.name(), iconTimeMs);
+            case "flicker" -> TooltipPainter.drawFlickerText(context, tr, displayTitle, nameX, nameY, theme.name(), iconTimeMs);
+            case "shiver", "shivering" -> TooltipPainter.drawShiverText(context, tr, displayTitle, nameX, nameY, theme.name(), iconTimeMs);
+            case "quiver"  -> TooltipPainter.drawQuiverText(context, tr, displayTitle, nameX, nameY, theme.name(), iconTimeMs);
+            case "breathe_spin_bob" -> TooltipPainter.drawBreatheSpinBobText(context, tr, displayTitle, nameX, nameY, theme.name(), iconTimeMs);
+            case "drop_bounce" -> TooltipPainter.drawDropBounceText(context, tr, displayTitle, nameX, nameY, theme.name(), tooltipElapsedMs);
             case "hinge_fall" -> {
                 // Clip title animation to tooltip bounds so off-panel motion stays hidden.
                 context.enableScissor(panelX + 1, panelY + 1, panelX + panelW - 1, panelY + panelH - 1);
-                TooltipPainter.drawHingeFallText(context, tr, model.title(), nameX, nameY, theme.name(), tooltipElapsedMs);
+                TooltipPainter.drawHingeFallText(context, tr, displayTitle, nameX, nameY, theme.name(), tooltipElapsedMs);
                 context.disableScissor();
             }
-            case "obfuscate" -> TooltipPainter.drawObfuscateText(context, tr, model.title(), nameX, nameY, theme.name(), tooltipElapsedMs);
-            case "static"  -> context.drawText(tr, Text.literal(model.title()).setStyle(
+            case "obfuscate" -> TooltipPainter.drawObfuscateText(context, tr, displayTitle, nameX, nameY, theme.name(), tooltipElapsedMs);
+            case "static"  -> context.drawText(tr, Text.literal(displayTitle).setStyle(
                                   Style.EMPTY.withColor(TextColor.fromRgb(theme.name() & 0x00FFFFFF))),
                                   nameX, nameY, theme.name(), true);
-            default        -> TooltipPainter.drawWaveText(context, tr, model.title(), nameX, nameY, theme.name(), iconTimeMs);
+            default        -> TooltipPainter.drawWaveText(context, tr, displayTitle, nameX, nameY, theme.name(), iconTimeMs);
         }
+        if (titleScale < 1.0f) context.getMatrices().pop();
 
         int badgeY = cursorY + 4 + tr.fontHeight + 3;
         if (badges != null && !badges.isEmpty()) {
@@ -632,20 +729,27 @@ public class TooltipRenderer {
 
         // ---- Body lines ----
         if (hasBody && drawStats) {
-            int contentLeft = panelX + padding();
+            int contentLeft  = panelX + padding();
             int contentRight = panelX + panelW - padding();
             for (int i = 0; i < wrappedBody.size(); i++) {
                 String line = wrappedBody.get(i);
-                InlineStatRow stat = bodyStats.get(i);
-                if (stat != null) {
-                    drawInlineStatRow(context, tr, stat, contentLeft, contentRight, cursorY, theme);
-                } else {
+                if (line.startsWith(ModernTooltipModel.SECTION_MARKER)) {
+                    String headerText = "\u25C6 " + line.substring(ModernTooltipModel.SECTION_MARKER.length());
                     context.drawText(tr,
-                            Text.literal(line).setStyle(Style.EMPTY.withColor(
-                                    TextColor.fromRgb(theme.body() & 0x00FFFFFF))),
-                            contentLeft, cursorY, theme.body(), true);
+                            Text.literal(headerText).setStyle(Style.EMPTY.withColor(
+                                    TextColor.fromRgb(theme.sectionHeader() & 0x00FFFFFF))),
+                            contentLeft, cursorY, theme.sectionHeader(), true);
+                    cursorY += lineHeight + sectionGap;
+                } else {
+                    InlineStatRow stat = bodyStats.get(i);
+                    if (stat != null) {
+                        drawInlineStatRow(context, tr, stat, contentLeft, contentRight, cursorY, theme, statValueColumnW);
+                    } else {
+                        drawTextWithHighlightedNumbers(context, tr, line,
+                                contentLeft, cursorY, theme.body(), theme.sectionHeader());
+                    }
+                    cursorY += statRowHeight(stat, lineHeight) + BODY_LINE_EXTRA_GAP;
                 }
-                cursorY += statRowHeight(stat, lineHeight);
             }
         }
 
@@ -655,21 +759,87 @@ public class TooltipRenderer {
                 TooltipPainter.drawSeparator(context, panelX + padding(), cursorY, panelW - padding() * 2, theme);
                 cursorY += separatorH;
             }
-            int extraColor = TooltipPainter.lerpColor(theme.body(), 0xFFB8C2CF, 0.30f);
-            int contentLeft = panelX + padding();
+            int extraColor   = TooltipPainter.lerpColor(theme.body(), 0xFFB8C2CF, 0.30f);
+            int contentLeft  = panelX + padding();
             int contentRight = panelX + panelW - padding();
             for (int i = 0; i < wrappedExtra.size(); i++) {
                 String line = wrappedExtra.get(i);
                 InlineStatRow stat = extraStats.get(i);
                 if (stat != null) {
-                    drawInlineStatRow(context, tr, stat, contentLeft, contentRight, cursorY, theme);
+                    drawInlineStatRow(context, tr, stat, contentLeft, contentRight, cursorY, theme, statValueColumnW);
                 } else {
-                    context.drawText(tr,
-                            Text.literal(line).setStyle(Style.EMPTY.withColor(
-                                    TextColor.fromRgb(extraColor & 0x00FFFFFF))),
-                            contentLeft, cursorY, extraColor, true);
+                    drawTextWithHighlightedNumbers(context, tr, line,
+                            contentLeft, cursorY, extraColor, theme.sectionHeader());
                 }
-                cursorY += statRowHeight(stat, lineHeight);
+                cursorY += statRowHeight(stat, lineHeight) + BODY_LINE_EXTRA_GAP;
+            }
+        }
+
+        // ---- Affixes tab ----
+        if (hasAffixes && drawAffixes) {
+            int contentLeft = panelX + padding();
+            boolean sawAffixContent = false;
+            int pendingLeadingRomanColor = 0;
+            boolean inSocketsSection = false;
+            boolean inGemDescriptionBlock = false;
+            for (int i = 0; i < wrappedAffixes.size(); i++) {
+                String line = wrappedAffixes.get(i);
+                if (line.startsWith(ModernTooltipModel.SECTION_MARKER)) {
+                    pendingLeadingRomanColor = 0;
+                    inGemDescriptionBlock = false;
+                    String sectionTitle = line.substring(ModernTooltipModel.SECTION_MARKER.length());
+                    inSocketsSection = isSocketsSectionTitle(sectionTitle);
+                    String headerText = "\u25C6 " + sectionTitle;
+                    if (sawAffixContent) {
+                        TooltipPainter.drawSeparator(context, panelX + padding(), cursorY,
+                                panelW - padding() * 2, theme);
+                        cursorY += separatorH;
+                    }
+                    context.drawText(tr,
+                            Text.literal(headerText).setStyle(Style.EMPTY.withColor(
+                                    TextColor.fromRgb(theme.sectionHeader() & 0x00FFFFFF))),
+                            contentLeft, cursorY, theme.sectionHeader(), true);
+                    cursorY += lineHeight + sectionGap;
+                } else if (line.equals(ModernTooltipModel.AFFIX_DIVIDER)) {
+                    pendingLeadingRomanColor = 0;
+                    inGemDescriptionBlock = false;
+                    int subtleColor = (theme.separator() & 0x00FFFFFF) | 0x28000000;
+                    int lineY = cursorY + 1;
+                    context.fill(contentLeft + 8, lineY,
+                            panelX + panelW - padding() - 8, lineY + 1, subtleColor);
+                    cursorY += AFFIX_DIVIDER_H;
+                } else {
+                    String trimmed = line.trim();
+                    if (isSocketEntryLine(trimmed)) {
+                        inGemDescriptionBlock = false;
+                    }
+                    boolean gemDescStart = inSocketsSection
+                            && line.startsWith("  ")
+                            && trimmed.startsWith("\u2022");
+                    boolean gemDescContinuation = inSocketsSection
+                            && inGemDescriptionBlock
+                            && !gemDescStart
+                            && line.startsWith(" ")
+                            && !trimmed.isEmpty()
+                            && !isSocketEntryLine(trimmed);
+                    if (gemDescStart) {
+                        inGemDescriptionBlock = true;
+                    } else if (inGemDescriptionBlock && !gemDescContinuation) {
+                        inGemDescriptionBlock = false;
+                    }
+
+                    boolean gemDescLine = gemDescStart || gemDescContinuation;
+                    int lineBaseColor = gemDescLine ? AFFIX_POSITIVE_COLOR : theme.body();
+                    int lineNumberColor = gemDescLine ? AFFIX_POSITIVE_COLOR : theme.sectionHeader();
+
+                    boolean nextIsDivider = i + 1 < wrappedAffixes.size()
+                            && wrappedAffixes.get(i + 1).equals(ModernTooltipModel.AFFIX_DIVIDER);
+                    pendingLeadingRomanColor = drawAffixTextWithHighlights(context, tr, line,
+                            contentLeft, cursorY, lineBaseColor, lineNumberColor,
+                            pendingLeadingRomanColor, altDown);
+                    cursorY += lineHeight + (nextIsDivider ? 0 : BODY_LINE_EXTRA_GAP);
+                    if (!line.trim().isEmpty()) sawAffixContent = true;
+                }
             }
         }
 
@@ -816,6 +986,123 @@ public class TooltipRenderer {
         return wrapped;
     }
 
+    private static List<String> wrapAffixStrings(List<String> lines, TextRenderer tr, int maxWidth) {
+        if (lines == null || lines.isEmpty()) return List.of();
+
+        List<String> wrapped = new ArrayList<>();
+        for (String raw : lines) {
+            if (raw == null || raw.isEmpty()) {
+                wrapped.add(" ");
+                continue;
+            }
+            if (raw.startsWith(ModernTooltipModel.SECTION_MARKER)
+                    || raw.equals(ModernTooltipModel.AFFIX_DIVIDER)) {
+                wrapped.add(raw);
+                continue;
+            }
+
+            int bulletIdx = raw.indexOf('\u2022');
+            if (bulletIdx >= 0) {
+                int prefixEnd = bulletIdx + 1;
+                while (prefixEnd < raw.length() && Character.isWhitespace(raw.charAt(prefixEnd))) {
+                    prefixEnd++;
+                }
+                String firstPrefix = raw.substring(0, prefixEnd);
+                String continuationPrefix = spacesForPixelWidth(tr, tr.getWidth(firstPrefix));
+                String content = raw.substring(prefixEnd).trim();
+                wrapped.addAll(wrapWithPrefix(content, firstPrefix, continuationPrefix, tr, maxWidth));
+            } else {
+                wrapped.addAll(TooltipPainter.wrapStrings(List.of(raw), tr, maxWidth));
+            }
+        }
+        return wrapped;
+    }
+
+    private static List<String> wrapWithPrefix(String content,
+                                               String firstPrefix,
+                                               String continuationPrefix,
+                                               TextRenderer tr,
+                                               int maxWidth) {
+        if (content == null || content.isEmpty()) return List.of(firstPrefix);
+
+        List<String> out = new ArrayList<>();
+        String[] words = content.split("\\s+");
+
+        StringBuilder current = new StringBuilder();
+        String prefix = firstPrefix;
+        for (String word : words) {
+            String candidateBody = current.isEmpty() ? word : current + " " + word;
+            String candidate = prefix + candidateBody;
+
+            if (tr.getWidth(candidate) > maxWidth && !current.isEmpty()) {
+                out.add(prefix + current);
+                current = new StringBuilder(word);
+                prefix = continuationPrefix;
+            } else {
+                current = new StringBuilder(candidateBody);
+            }
+        }
+
+        if (!current.isEmpty()) {
+            out.add(prefix + current);
+        }
+        return out;
+    }
+
+    private static String spacesForPixelWidth(TextRenderer tr, int pixelWidth) {
+        if (pixelWidth <= 0) return "";
+        StringBuilder sb = new StringBuilder();
+        while (tr.getWidth(sb.toString()) < pixelWidth) {
+            sb.append(' ');
+        }
+        return sb.toString();
+    }
+
+    private static List<String> filterBracketOnlyAffixLines(List<String> wrappedAffixes, boolean altDown) {
+        if (wrappedAffixes == null || wrappedAffixes.isEmpty() || altDown) {
+            return wrappedAffixes != null ? wrappedAffixes : List.of();
+        }
+
+        List<String> filtered = new ArrayList<>(wrappedAffixes.size());
+        for (String line : wrappedAffixes) {
+            if (line == null || line.isEmpty()) {
+                filtered.add(line);
+                continue;
+            }
+            if (line.startsWith(ModernTooltipModel.SECTION_MARKER)
+                    || line.equals(ModernTooltipModel.AFFIX_DIVIDER)) {
+                filtered.add(line);
+                continue;
+            }
+
+            String withoutBrackets = removeBracketedSegments(line);
+            if (withoutBrackets.trim().isEmpty()) {
+                continue;
+            }
+            filtered.add(line);
+        }
+        return filtered;
+    }
+
+    private static String removeBracketedSegments(String text) {
+        if (text == null || text.isEmpty()) return "";
+        StringBuilder out = new StringBuilder(text.length());
+        int depth = 0;
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (c == '[') {
+                depth++;
+                continue;
+            }
+            if (c == ']') {
+                if (depth > 0) depth--;
+                continue;
+            }
+            if (depth == 0) out.append(c);
+        }
+        return out.toString();
+    }
+
     private static InlineStatRow parseInlineStatRow(String line) {
         if (line == null) return null;
         Matcher matcher = INLINE_STAT_PATTERN.matcher(line);
@@ -830,21 +1117,23 @@ public class TooltipRenderer {
 
         String rawLabel = matcher.group(2).toLowerCase();
         return switch (rawLabel) {
-            case "attack damage" -> new InlineStatRow("Attack Damage", value, 0.0, 14.0);
-            case "attack speed"  -> new InlineStatRow("Attack Speed",  value, 0.0, 3.0);
-            case "attack range"  -> new InlineStatRow("Attack Range",  value, 0.0, 5.0);
+            case "attack damage"             -> new InlineStatRow("Attack Damage", value, 0.0, 14.0);
+            case "attack speed"              -> new InlineStatRow("Attack Speed",  value, 0.0, 3.0);
+            case "attack range",
+                 "entity interaction range"  -> new InlineStatRow("Attack Range",  value, 0.0, 5.0);
             default -> null;
         };
     }
 
     private static String formatStatValue(double value) {
-        return AttributeModifiersComponent.DECIMAL_FORMAT.format(value);
+        double rounded = Math.round(value * 10.0d) / 10.0d;
+        return AttributeModifiersComponent.DECIMAL_FORMAT.format(rounded);
     }
 
     private static void drawInlineStatRow(DrawContext context, TextRenderer tr, InlineStatRow stat,
-                                          int contentLeft, int contentRight, int y, TooltipTheme theme) {
+                                          int contentLeft, int contentRight, int y,
+                                          TooltipTheme theme, int valueColumnW) {
         int labelColumnW = statLabelColumnWidth(tr);
-        int valueColumnW = statValueColumnWidth(tr);
         String valueText = formatStatValue(stat.value());
         int valueW = tr.getWidth(valueText);
         int valueX = contentRight - valueW;
@@ -897,8 +1186,21 @@ public class TooltipRenderer {
         return lineHeight;
     }
 
-    private static int statRowMinWidth(TextRenderer tr, InlineStatRow stat) {
-        return statLabelColumnWidth(tr) + 8 + STAT_BAR_MIN_WIDTH + 8 + statValueColumnWidth(tr);
+    private static int statRowMinWidth(TextRenderer tr, InlineStatRow stat, int valueColumnW) {
+        return statLabelColumnWidth(tr) + 8 + STAT_BAR_MIN_WIDTH + 8 + valueColumnW;
+    }
+
+    private static int inlineStatValueColumnWidth(TextRenderer tr,
+                                                  List<InlineStatRow> bodyStats,
+                                                  List<InlineStatRow> extraStats) {
+        int w = statValueColumnWidth(tr);
+        for (InlineStatRow stat : bodyStats) {
+            if (stat != null) w = Math.max(w, tr.getWidth(formatStatValue(stat.value())));
+        }
+        for (InlineStatRow stat : extraStats) {
+            if (stat != null) w = Math.max(w, tr.getWidth(formatStatValue(stat.value())));
+        }
+        return w;
     }
 
     private static int statLabelColumnWidth(TextRenderer tr) {
@@ -910,6 +1212,7 @@ public class TooltipRenderer {
         w = Math.max(w, tr.getWidth(formatStatValue(0.0)));
         w = Math.max(w, tr.getWidth(formatStatValue(5.0)));
         w = Math.max(w, tr.getWidth(formatStatValue(10.0)));
+        w = Math.max(w, tr.getWidth(formatStatValue(13.5)));
         w = Math.max(w, tr.getWidth(formatStatValue(32.0)));
         return w;
     }
@@ -950,7 +1253,295 @@ public class TooltipRenderer {
         return id != null && "simplybows".equals(id.getNamespace());
     }
 
+    /**
+     * Returns the longest prefix of {@code title} that fits within {@code maxWidth} pixels
+     * when rendered by {@code tr}, with {@code "..."} appended as a suffix.
+     * If even the ellipsis alone exceeds {@code maxWidth}, returns {@code "..."}.
+     */
+    private static String truncateTitleToWidth(TextRenderer tr, String title, int maxWidth) {
+        if (tr.getWidth(title) <= maxWidth) return title;
+        String ellipsis = "...";
+        int ellipsisW   = tr.getWidth(ellipsis);
+        int maxContentW = maxWidth - ellipsisW;
+        if (maxContentW <= 0) return ellipsis;
+        int last = 0;
+        for (int i = 0; i < title.length(); i++) {
+            if (tr.getWidth(title.substring(0, i + 1)) > maxContentW) break;
+            last = i + 1;
+        }
+        return title.substring(0, last) + ellipsis;
+    }
+
+    /**
+     * Draws {@code text} at ({@code x}, {@code y}), coloring numeric substrings (integers and
+     * decimals) with {@code numberColor} and all other characters with {@code baseColor}.
+     *
+     * <p>Uses {@link #NUMBER_SEGMENT_PATTERN} to split the string into alternating non-numeric
+     * and numeric segments; each segment is rendered sequentially with the correct colour and
+     * x-offset advanced by the rendered width of the previous segment.
+     */
+    private static void drawTextWithHighlightedNumbers(DrawContext context, TextRenderer tr,
+                                                       String text, int x, int y,
+                                                       int baseColor, int numberColor) {
+        drawTextRangeWithNumberHighlight(context, tr, text, 0, text != null ? text.length() : 0,
+                x, y, baseColor, numberColor);
+    }
+
+    private static boolean isSocketsSectionTitle(String sectionTitle) {
+        if (sectionTitle == null) return false;
+        String lower = sectionTitle.trim().toLowerCase(Locale.ROOT);
+        return lower.equals("sockets") || lower.contains("socket");
+    }
+
+    private static boolean isSocketEntryLine(String trimmedLine) {
+        return trimmedLine.startsWith("\u25C8") || trimmedLine.startsWith("\u25C7");
+    }
+
+    private static int drawAffixTextWithHighlights(DrawContext context, TextRenderer tr,
+                                                    String text, int x, int y,
+                                                    int baseColor, int numberColor,
+                                                    int carryLeadingRomanColor,
+                                                    boolean showBracketedText) {
+        if (text == null || text.isEmpty()) return 0;
+
+        int len = text.length();
+        int[] colors = new int[len];
+        java.util.Arrays.fill(colors, baseColor);
+
+        Matcher numberMatcher = NUMBER_SEGMENT_PATTERN.matcher(text);
+        while (numberMatcher.find()) {
+            for (int i = numberMatcher.start(1); i < numberMatcher.end(1); i++) {
+                colors[i] = numberColor;
+            }
+        }
+
+        for (ColoredSpan span : findStatusEffectSpans(text)) {
+            for (int i = Math.max(0, span.start()); i < Math.min(len, span.end()); i++) {
+                colors[i] = span.color();
+            }
+        }
+
+        if (carryLeadingRomanColor != 0) {
+            paintLeadingRomanNumeral(colors, text, carryLeadingRomanColor);
+        }
+
+        boolean[] hidden = new boolean[len];
+        for (BracketSpan span : findBracketSpans(text)) {
+            for (int i = Math.max(0, span.start()); i < Math.min(len, span.end()); i++) {
+                if (showBracketedText) {
+                    colors[i] = withScaledAlpha(colors[i], 0.5f);
+                } else {
+                    hidden[i] = true;
+                }
+            }
+        }
+
+        int curX = x;
+        int segStart = -1;
+        int segColor = 0;
+        for (int i = 0; i < len; i++) {
+            if (hidden[i]) {
+                if (segStart >= 0) {
+                    curX = drawTextSegment(context, tr, text.substring(segStart, i), curX, y, segColor);
+                    segStart = -1;
+                }
+                continue;
+            }
+
+            if (segStart < 0) {
+                segStart = i;
+                segColor = colors[i];
+            } else if (colors[i] != segColor) {
+                curX = drawTextSegment(context, tr, text.substring(segStart, i), curX, y, segColor);
+                segStart = i;
+                segColor = colors[i];
+            }
+        }
+        if (segStart >= 0) {
+            drawTextSegment(context, tr, text.substring(segStart), curX, y, segColor);
+        }
+        return trailingEffectColor(text);
+    }
+
+    private static int drawTextRangeWithNumberHighlight(DrawContext context, TextRenderer tr,
+                                                         String text, int start, int end,
+                                                         int x, int y,
+                                                         int baseColor, int numberColor) {
+        if (text == null || start >= end) return x;
+
+        String segment = text.substring(start, end);
+        Matcher m = NUMBER_SEGMENT_PATTERN.matcher(segment);
+        int lastEnd = 0;
+        int curX = x;
+
+        while (m.find()) {
+            if (m.start() > lastEnd) {
+                curX = drawTextSegment(context, tr, segment.substring(lastEnd, m.start()), curX, y, baseColor);
+            }
+            curX = drawTextSegment(context, tr, m.group(1), curX, y, numberColor);
+            lastEnd = m.end();
+        }
+
+        if (lastEnd < segment.length()) {
+            curX = drawTextSegment(context, tr, segment.substring(lastEnd), curX, y, baseColor);
+        }
+
+        return curX;
+    }
+
+    private static int drawTextSegment(DrawContext context, TextRenderer tr, String seg, int x, int y, int color) {
+        if (seg == null || seg.isEmpty()) return x;
+        context.drawText(tr, Text.literal(seg), x, y, color, true);
+        return x + tr.getWidth(seg);
+    }
+
+    private static List<BracketSpan> findBracketSpans(String text) {
+        if (text == null || text.isEmpty()) return List.of();
+
+        List<BracketSpan> spans = new ArrayList<>();
+        int from = 0;
+        while (from < text.length()) {
+            int open = text.indexOf('[', from);
+            if (open < 0) break;
+
+            int close = text.indexOf(']', open + 1);
+            if (close < 0) break;
+
+            spans.add(new BracketSpan(open, close + 1));
+            from = close + 1;
+        }
+        return spans;
+    }
+
+    private static int withScaledAlpha(int color, float factor) {
+        int alpha = (color >>> 24) & 0xFF;
+        if (alpha == 0) alpha = 0xFF;
+        int scaled = Math.max(0, Math.min(255, Math.round(alpha * factor)));
+        return (color & 0x00FFFFFF) | (scaled << 24);
+    }
+
+    private static void paintLeadingRomanNumeral(int[] colors, String text, int color) {
+        int i = 0;
+        while (i < text.length() && Character.isWhitespace(text.charAt(i))) i++;
+        int start = i;
+        while (i < text.length() && isRomanNumeralChar(text.charAt(i))) i++;
+        if (i <= start) return;
+        if (i < text.length() && Character.isLetter(text.charAt(i))) return;
+
+        for (int p = start; p < i; p++) {
+            colors[p] = color;
+        }
+    }
+
+    private static int trailingEffectColor(String text) {
+        if (text == null || text.isEmpty()) return 0;
+
+        int end = text.length();
+        while (end > 0 && Character.isWhitespace(text.charAt(end - 1))) end--;
+        if (end <= 0) return 0;
+
+        String lower = text.substring(0, end).toLowerCase(Locale.ROOT);
+        for (EffectNameEntry entry : getStatusEffectEntries()) {
+            String name = entry.lowerName();
+            if (!lower.endsWith(name)) continue;
+
+            int start = end - name.length();
+            if (!isWordBoundary(text, start - 1) || !isWordBoundary(text, end)) continue;
+            return entry.color();
+        }
+
+        return 0;
+    }
+
+    private static List<ColoredSpan> findStatusEffectSpans(String text) {
+        if (text == null || text.isEmpty()) return List.of();
+
+        String lower = text.toLowerCase(Locale.ROOT);
+        List<ColoredSpan> spans = new ArrayList<>();
+        for (EffectNameEntry entry : getStatusEffectEntries()) {
+            int from = 0;
+            while (true) {
+                int idx = lower.indexOf(entry.lowerName(), from);
+                if (idx < 0) break;
+                int end = idx + entry.lowerName().length();
+                from = idx + 1;
+
+                if (!isWordBoundary(text, idx - 1) || !isWordBoundary(text, end)) {
+                    continue;
+                }
+
+                int spanEnd = extendRomanNumeralSuffix(text, end);
+                if (!overlapsExistingSpan(spans, idx, spanEnd)) {
+                    spans.add(new ColoredSpan(idx, spanEnd, entry.color()));
+                }
+            }
+        }
+
+        if (spans.isEmpty()) return List.of();
+        spans.sort(Comparator.comparingInt(ColoredSpan::start));
+        return spans;
+    }
+
+    private static List<EffectNameEntry> getStatusEffectEntries() {
+        List<EffectNameEntry> cached = STATUS_EFFECT_ENTRIES;
+        if (cached != null) return cached;
+
+        List<EffectNameEntry> built = new ArrayList<>();
+        for (StatusEffect effect : Registries.STATUS_EFFECT) {
+            String name = Text.translatable(effect.getTranslationKey()).getString();
+            if (name == null) continue;
+            String normalized = name.trim();
+            if (normalized.isEmpty()) continue;
+
+            built.add(new EffectNameEntry(normalized.toLowerCase(Locale.ROOT), colorForCategory(effect.getCategory())));
+        }
+
+        built.sort((a, b) -> Integer.compare(b.lowerName().length(), a.lowerName().length()));
+        STATUS_EFFECT_ENTRIES = built;
+        return built;
+    }
+
+    private static int colorForCategory(StatusEffectCategory category) {
+        if (category == StatusEffectCategory.BENEFICIAL) return AFFIX_POSITIVE_COLOR;
+        if (category == StatusEffectCategory.HARMFUL) return AFFIX_NEGATIVE_COLOR;
+        return AFFIX_NEUTRAL_COLOR;
+    }
+
+    private static boolean overlapsExistingSpan(List<ColoredSpan> spans, int start, int end) {
+        for (ColoredSpan span : spans) {
+            if (start < span.end() && end > span.start()) return true;
+        }
+        return false;
+    }
+
+    private static boolean isWordBoundary(String text, int index) {
+        if (index < 0 || index >= text.length()) return true;
+        char c = text.charAt(index);
+        return !Character.isLetterOrDigit(c);
+    }
+
+    private static int extendRomanNumeralSuffix(String text, int end) {
+        int i = end;
+        while (i < text.length() && Character.isWhitespace(text.charAt(i))) i++;
+        int romanStart = i;
+        while (i < text.length() && isRomanNumeralChar(text.charAt(i))) i++;
+        return i > romanStart ? i : end;
+    }
+
+    private static boolean isRomanNumeralChar(char c) {
+        return switch (Character.toUpperCase(c)) {
+            case 'I', 'V', 'X', 'L', 'C', 'D', 'M' -> true;
+            default -> false;
+        };
+    }
+
     private record InlineStatRow(String label, double value, double min, double max) {}
+
+    private record EffectNameEntry(String lowerName, int color) {}
+
+    private record ColoredSpan(int start, int end, int color) {}
+
+    private record BracketSpan(int start, int end) {}
 
     private record AbilitySectionData(String header, List<String> lines) {}
 

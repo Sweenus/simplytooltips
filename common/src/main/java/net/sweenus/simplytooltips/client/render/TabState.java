@@ -19,14 +19,15 @@ import java.util.List;
 public class TabState {
 
     /**
-     * The three content tabs, in cycle order.
+     * The content tabs, in cycle order.
      * <ul>
-     *   <li>{@code LORE}  — ability / description lines</li>
-     *   <li>{@code FORGE} — upgrade section</li>
-     *   <li>{@code STATS} — body and extra lines</li>
+     *   <li>{@code LORE}    — ability / description lines</li>
+     *   <li>{@code FORGE}   — upgrade section</li>
+     *   <li>{@code STATS}   — body and extra lines (stat bars, attributes)</li>
+     *   <li>{@code AFFIXES} — Apotheosis affix bullets and socket summary (only shown when present)</li>
      * </ul>
      */
-    public enum Tab { LORE, FORGE, STATS }
+    public enum Tab { LORE, FORGE, STATS, AFFIXES }
 
     private static int        activeIndex  = 0;
     private static List<Tab>  activeTabs   = Collections.emptyList();

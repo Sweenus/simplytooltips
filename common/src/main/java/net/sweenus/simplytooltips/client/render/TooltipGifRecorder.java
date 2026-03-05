@@ -32,7 +32,7 @@ import java.util.concurrent.Executors;
  */
 public final class TooltipGifRecorder {
 
-    private static final int CAPTURE_DURATION_MS = 6000;
+    private static final int CAPTURE_DURATION_MS = 4000;
     private static final int TARGET_FPS = 20;
     private static final int FRAME_DELAY_CS = 100 / TARGET_FPS;
     private static final int FRAME_INTERVAL_MS = 1000 / TARGET_FPS;
