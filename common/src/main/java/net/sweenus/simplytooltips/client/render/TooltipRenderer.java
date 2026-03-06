@@ -74,6 +74,12 @@ public class TooltipRenderer {
     private static final int AFFIX_NEUTRAL_COLOR  = 0xFFB8742F;
     private static volatile List<EffectNameEntry> STATUS_EFFECT_ENTRIES;
 
+    // Lazily cached results of tr.getWidth() on constant strings — these never change at runtime.
+    private static int cachedStatLabelW = -1;
+    private static int cachedStatValueW = -1;
+
+    // Single-slot cache for the most recently rendered item's built model and wrapped text data.
+    private static ModelBuildCache modelBuildCache = null;
 
     private static int padding()      { return SimplyTooltipsConfig.INSTANCE.layout.padding.get(); }
     private static int lineSpacing()  { return SimplyTooltipsConfig.INSTANCE.layout.lineSpacing.get(); }
@@ -103,49 +109,122 @@ public class TooltipRenderer {
         boolean altDown = false;
         try { altDown = Screen.hasAltDown(); } catch (Throwable ignored) {}
 
-        ModernTooltipModel model = provider.build(stack, rawLines, altDown);
-        // Post-process: move Apotheosis affix/imbue lines to the STATS tab bodyLines
-        // under a dedicated "Affixes" section header, regardless of which provider ran.
-        model = ApotheosisCompat.augment(model, rawLines, stack, altDown);
+        // ---- Build model and wrap text (with single-slot per-item cache) ----
+        // Rebuilding the model, running Apotheosis augmentation, resolving the theme,
+        // wrapping all text, and running regex stat-parsing is expensive and produces
+        // identical results every frame while the same item is hovered. Cache and reuse.
+        final int currMaxW = maxTextWidth();
+        ModelBuildCache mbc = modelBuildCache;
 
-        // Resolve theme via priority chain: provider key > item/tag data > rarity
-        ThemeDefinition resolvedDef      = resolveTheme(stack, model);
-        final TooltipTheme theme         = resolvedDef.colors();
-        final String       motifStr      = resolvedDef.motif();
-        final int          borderStyle   = borderStyleFor(motifStr);
-        final String resolvedMotifKey    = "none".equals(motifStr) ? null : motifStr;
-        final String itemAnimStyle       = resolvedDef.itemAnimStyle();
-        final String titleAnimStyle      = resolvedDef.titleAnimStyle();
-        final String itemBorderShape     = resolvedDef.itemBorderShape();
+        final ModernTooltipModel model;
+        final ThemeDefinition    resolvedDef;
+        final int                borderStyle;
+        final String             resolvedMotifKey;
+        final String             itemAnimStyle;
+        final String             titleAnimStyle;
+        final String             itemBorderShape;
+        final List<String>       badges;
+        final AbilitySectionData abilitySection;
+        final List<String>       wrappedAbility;
+        final List<String>       wrappedCustom;
+        final List<String>       wrappedBody;
+        final List<String>       wrappedAffixes;
+        final List<String>       wrappedExtra;
+        final List<String>       wrappedRuneEffect;
+        final List<InlineStatRow> bodyStats;
+        final List<InlineStatRow> extraStats;
+        final int                 statValueColumnW;
 
-        // Data-driven badge override: item_themes JSON can replace the provider's default badges
-        List<String> dataBadges = ItemThemeRegistry.resolveBadgesForStack(stack);
-        List<String> badges = dataBadges != null ? dataBadges : model.badges();
+        if (mbc != null
+                && ItemStack.areEqual(mbc.stack, stack)
+                && mbc.altDown == altDown
+                && mbc.maxW    == currMaxW) {
+            // Cache hit — reuse everything from the previous frame.
+            model             = mbc.model;
+            resolvedDef       = mbc.resolvedDef;
+            borderStyle       = mbc.borderStyle;
+            resolvedMotifKey  = mbc.resolvedMotifKey;
+            itemAnimStyle     = mbc.itemAnimStyle;
+            titleAnimStyle    = mbc.titleAnimStyle;
+            itemBorderShape   = mbc.itemBorderShape;
+            badges            = mbc.badges;
+            abilitySection    = mbc.abilitySection;
+            wrappedAbility    = mbc.wrappedAbility;
+            wrappedCustom     = mbc.wrappedCustom;
+            wrappedBody       = mbc.wrappedBody;
+            wrappedAffixes    = mbc.wrappedAffixes;
+            wrappedExtra      = mbc.wrappedExtra;
+            wrappedRuneEffect = mbc.wrappedRuneEffect;
+            bodyStats         = mbc.bodyStats;
+            extraStats        = mbc.extraStats;
+            statValueColumnW  = mbc.statValueColumnW;
+        } else {
+            // Cache miss — build everything from scratch and store it.
+            ModernTooltipModel builtModel = provider.build(stack, rawLines, altDown);
+            // Post-process: move Apotheosis affix/imbue lines to the AFFIXES tab,
+            // regardless of which provider ran.
+            builtModel  = ApotheosisCompat.augment(builtModel, rawLines, stack, altDown);
+            model       = builtModel;
 
+            // Resolve theme via priority chain: provider key > item/tag data > rarity
+            ThemeDefinition builtDef = resolveTheme(stack, model);
+            resolvedDef  = builtDef;
+            final String motifStr = resolvedDef.motif();
+            borderStyle      = borderStyleFor(motifStr);
+            resolvedMotifKey = "none".equals(motifStr) ? null : motifStr;
+            itemAnimStyle    = resolvedDef.itemAnimStyle();
+            titleAnimStyle   = resolvedDef.titleAnimStyle();
+            itemBorderShape  = resolvedDef.itemBorderShape();
+
+            // Data-driven badge override: item_themes JSON can replace the provider's default badges
+            List<String> dataBadges = ItemThemeRegistry.resolveBadgesForStack(stack);
+            badges = dataBadges != null ? dataBadges : model.badges();
+
+            // Text wrapping & stat parsing
+            AbilitySectionData builtSection = prepareAbilitySection(stack, model.abilityLines());
+            abilitySection  = builtSection;
+            wrappedAbility  = TooltipPainter.wrapStrings(abilitySection.lines(), tr, currMaxW);
+            wrappedCustom   = wrapCustomTextKeys(resolvedDef.customTextKeys(), tr, currMaxW);
+            wrappedBody     = TooltipPainter.wrapStrings(model.bodyLines(), tr, currMaxW);
+
+            List<String> builtAffixes = model.affixLines() != null
+                    ? wrapAffixStrings(model.affixLines(), tr, currMaxW)
+                    : List.of();
+            wrappedAffixes  = filterBracketOnlyAffixLines(builtAffixes, altDown);
+
+            List<InlineStatRow> builtBodyStats = new ArrayList<>(wrappedBody.size());
+            for (String line : wrappedBody) builtBodyStats.add(parseInlineStatRow(line));
+            bodyStats = builtBodyStats;
+
+            List<String> builtExtra = new ArrayList<>();
+            for (Text t : model.extraLines())
+                builtExtra.addAll(TooltipPainter.wrapStrings(List.of(t.getString()), tr, currMaxW));
+            wrappedExtra = builtExtra;
+
+            List<InlineStatRow> builtExtraStats = new ArrayList<>(wrappedExtra.size());
+            for (String line : wrappedExtra) builtExtraStats.add(parseInlineStatRow(line));
+            extraStats = builtExtraStats;
+
+            statValueColumnW = inlineStatValueColumnWidth(tr, bodyStats, extraStats);
+
+            // Rune effect lines are part of the model; wrap them here so they are cached too.
+            UpgradeSection us = model.upgradeSection();
+            wrappedRuneEffect = us != null
+                    ? TooltipPainter.wrapStrings(us.rune().effectLines(), tr, currMaxW)
+                    : List.of();
+
+            modelBuildCache = new ModelBuildCache(
+                    stack, altDown, currMaxW,
+                    model, resolvedDef, borderStyle, resolvedMotifKey,
+                    itemAnimStyle, titleAnimStyle, itemBorderShape,
+                    badges, abilitySection,
+                    wrappedAbility, wrappedCustom, wrappedBody,
+                    wrappedAffixes, wrappedExtra, wrappedRuneEffect,
+                    bodyStats, extraStats, statValueColumnW);
+        }
+
+        final TooltipTheme theme = resolvedDef.colors();
         long tooltipElapsedMs = TooltipAnimator.updateAndGetElapsed(stack, model.animKeyExtra());
-
-        // ---- Text wrapping ----
-        AbilitySectionData abilitySection = prepareAbilitySection(stack, model.abilityLines());
-        List<String> wrappedAbility  = TooltipPainter.wrapStrings(abilitySection.lines(), tr, maxTextWidth());
-        List<String> wrappedCustom   = wrapCustomTextKeys(resolvedDef.customTextKeys(), tr, maxTextWidth());
-        List<String> wrappedBody     = TooltipPainter.wrapStrings(model.bodyLines(), tr, maxTextWidth());
-        List<String> wrappedAffixes  = model.affixLines() != null
-                ? wrapAffixStrings(model.affixLines(), tr, maxTextWidth())
-                : List.of();
-        wrappedAffixes = filterBracketOnlyAffixLines(wrappedAffixes, altDown);
-        List<InlineStatRow> bodyStats = new ArrayList<>(wrappedBody.size());
-        for (String line : wrappedBody) {
-            bodyStats.add(parseInlineStatRow(line));
-        }
-        List<String> wrappedExtra   = new ArrayList<>();
-        for (Text t : model.extraLines()) {
-            wrappedExtra.addAll(TooltipPainter.wrapStrings(List.of(t.getString()), tr, maxTextWidth()));
-        }
-        List<InlineStatRow> extraStats = new ArrayList<>(wrappedExtra.size());
-        for (String line : wrappedExtra) {
-            extraStats.add(parseInlineStatRow(line));
-        }
-        int statValueColumnW = inlineStatValueColumnWidth(tr, bodyStats, extraStats);
 
         // ---- Tab and scroll state ----
         Identifier itemId = Registries.ITEM.getId(stack.getItem());
@@ -196,9 +275,7 @@ public class TooltipRenderer {
                 hasBody
                         || (!tabsActive && (hasAbility || hasCustom || hasUpgrade))
         );
-        List<String> wrappedRuneEffect = hasUpgrade
-                ? TooltipPainter.wrapStrings(upgradeSection.rune().effectLines(), tr, maxTextWidth())
-                : List.of();
+        // wrappedRuneEffect is now built and cached in the ModelBuildCache block above.
         boolean hasAffixes    = !wrappedAffixes.isEmpty();
         boolean hasBodyContent = (hasAbility && drawLore)
                 || (hasCustom && drawLore)
@@ -1051,11 +1128,12 @@ public class TooltipRenderer {
 
     private static String spacesForPixelWidth(TextRenderer tr, int pixelWidth) {
         if (pixelWidth <= 0) return "";
-        StringBuilder sb = new StringBuilder();
-        while (tr.getWidth(sb.toString()) < pixelWidth) {
-            sb.append(' ');
-        }
-        return sb.toString();
+        int spaceW = tr.getWidth(" ");
+        if (spaceW <= 0) return "";
+        int count = Math.max(0, pixelWidth / spaceW);
+        String s = " ".repeat(count);
+        while (tr.getWidth(s) < pixelWidth) s += " ";
+        return s;
     }
 
     private static List<String> filterBracketOnlyAffixLines(List<String> wrappedAffixes, boolean altDown) {
@@ -1203,17 +1281,22 @@ public class TooltipRenderer {
         return w;
     }
 
+    /** Width of the fixed stat label column. Cached after first call — the font metrics never change. */
     private static int statLabelColumnWidth(TextRenderer tr) {
-        return tr.getWidth(STAT_LABEL_REFERENCE);
+        if (cachedStatLabelW < 0) cachedStatLabelW = tr.getWidth(STAT_LABEL_REFERENCE);
+        return cachedStatLabelW;
     }
 
+    /** Width of the widest formatted stat value. Cached after first call — inputs are constant strings. */
     private static int statValueColumnWidth(TextRenderer tr) {
+        if (cachedStatValueW >= 0) return cachedStatValueW;
         int w = 0;
         w = Math.max(w, tr.getWidth(formatStatValue(0.0)));
         w = Math.max(w, tr.getWidth(formatStatValue(5.0)));
         w = Math.max(w, tr.getWidth(formatStatValue(10.0)));
         w = Math.max(w, tr.getWidth(formatStatValue(13.5)));
         w = Math.max(w, tr.getWidth(formatStatValue(32.0)));
+        cachedStatValueW = w;
         return w;
     }
 
@@ -1544,6 +1627,76 @@ public class TooltipRenderer {
     private record BracketSpan(int start, int end) {}
 
     private record AbilitySectionData(String header, List<String> lines) {}
+
+    /**
+     * Single-slot cache of all expensive per-frame tooltip work.
+     * Populated on the first render for an item; reused every subsequent frame while the
+     * same item (same registry entry + same component data + same alt state + same maxTextWidth)
+     * is hovered.  Invalidated automatically when any key field changes.
+     *
+     * <p>Avoids per-frame: provider.build(), ApotheosisCompat.augment(), resolveTheme(),
+     * wrapStrings() × 5, parseInlineStatRow() × N, inlineStatValueColumnWidth().
+     */
+    private static final class ModelBuildCache {
+        // --- Key fields (checked before using cached data) ---
+        final ItemStack stack;
+        final boolean   altDown;
+        final int       maxW;
+
+        // --- Cached results ---
+        final ModernTooltipModel model;
+        final ThemeDefinition    resolvedDef;
+        final int                borderStyle;
+        final String             resolvedMotifKey;
+        final String             itemAnimStyle;
+        final String             titleAnimStyle;
+        final String             itemBorderShape;
+        final List<String>       badges;
+
+        final AbilitySectionData abilitySection;
+        final List<String>       wrappedAbility;
+        final List<String>       wrappedCustom;
+        final List<String>       wrappedBody;
+        final List<String>       wrappedAffixes;
+        final List<String>       wrappedExtra;
+        final List<String>       wrappedRuneEffect;
+        final List<InlineStatRow> bodyStats;
+        final List<InlineStatRow> extraStats;
+        final int                 statValueColumnW;
+
+        ModelBuildCache(ItemStack stack, boolean altDown, int maxW,
+                        ModernTooltipModel model, ThemeDefinition resolvedDef,
+                        int borderStyle, String resolvedMotifKey,
+                        String itemAnimStyle, String titleAnimStyle, String itemBorderShape,
+                        List<String> badges, AbilitySectionData abilitySection,
+                        List<String> wrappedAbility, List<String> wrappedCustom,
+                        List<String> wrappedBody, List<String> wrappedAffixes,
+                        List<String> wrappedExtra, List<String> wrappedRuneEffect,
+                        List<InlineStatRow> bodyStats, List<InlineStatRow> extraStats,
+                        int statValueColumnW) {
+            this.stack            = stack;
+            this.altDown          = altDown;
+            this.maxW             = maxW;
+            this.model            = model;
+            this.resolvedDef      = resolvedDef;
+            this.borderStyle      = borderStyle;
+            this.resolvedMotifKey = resolvedMotifKey;
+            this.itemAnimStyle    = itemAnimStyle;
+            this.titleAnimStyle   = titleAnimStyle;
+            this.itemBorderShape  = itemBorderShape;
+            this.badges           = badges;
+            this.abilitySection   = abilitySection;
+            this.wrappedAbility   = wrappedAbility;
+            this.wrappedCustom    = wrappedCustom;
+            this.wrappedBody      = wrappedBody;
+            this.wrappedAffixes   = wrappedAffixes;
+            this.wrappedExtra     = wrappedExtra;
+            this.wrappedRuneEffect = wrappedRuneEffect;
+            this.bodyStats        = bodyStats;
+            this.extraStats       = extraStats;
+            this.statValueColumnW = statValueColumnW;
+        }
+    }
 
     private TooltipRenderer() {}
 }

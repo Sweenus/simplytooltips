@@ -38,6 +38,7 @@ public abstract class DrawContextMixin {
     @Unique private static Field simplytooltips$cachedFocusedSlotField = null;
     @Unique private static boolean simplytooltips$focusedSlotFieldResolved = false;
     @Unique private static final Map<String, ItemStack> simplytooltips$nameToStackCache = new HashMap<>();
+    @Unique private static Map<String, ItemStack> simplytooltips$itemNameLookup = null;
 
     // --- Injection points ---
 
@@ -153,18 +154,26 @@ public abstract class DrawContextMixin {
             }
         }
 
-        ItemStack cached = simplytooltips$nameToStackCache.get(title);
-        if (cached != null) return cached;
-
-        for (Item item : Registries.ITEM) {
-            ItemStack candidate = new ItemStack(item);
-            if (candidate.getName().getString().equals(title)) {
-                simplytooltips$nameToStackCache.put(title, candidate);
-                return candidate;
-            }
+        // Per-title cache covers both positive and negative results.
+        if (simplytooltips$nameToStackCache.containsKey(title)) {
+            ItemStack cached = simplytooltips$nameToStackCache.get(title);
+            return cached != null ? cached : ItemStack.EMPTY;
         }
 
-        return ItemStack.EMPTY;
+        // Build the reverse-lookup map lazily on first use (runs once per session).
+        if (simplytooltips$itemNameLookup == null) {
+            Map<String, ItemStack> lookup = new HashMap<>();
+            for (Item item : Registries.ITEM) {
+                ItemStack candidate = new ItemStack(item);
+                lookup.put(candidate.getName().getString(), candidate);
+            }
+            simplytooltips$itemNameLookup = lookup;
+        }
+
+        ItemStack found = simplytooltips$itemNameLookup.getOrDefault(title, ItemStack.EMPTY);
+        // Cache the result — including EMPTY — so this title is never looked up again.
+        simplytooltips$nameToStackCache.put(title, found);
+        return found;
     }
 
     @Unique

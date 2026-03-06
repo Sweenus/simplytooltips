@@ -35,13 +35,13 @@ public class TooltipPainter {
 
     // --- Background ---
 
-    /** Fills the tooltip panel with a vertical gradient from {@code theme.bgTop()} to {@code theme.bgBottom()}. */
+    /**
+     * Fills the tooltip panel with a vertical gradient from {@code theme.bgTop()} to {@code theme.bgBottom()}.
+     *
+     * <p>Uses a single {@code fillGradient} call instead of one {@code fill} per scanline.
+     */
     public static void drawGradientBackground(DrawContext context, int x, int y, int w, int h, TooltipTheme theme) {
-        for (int i = 0; i < h; i++) {
-            float t = h <= 1 ? 0.0F : (float) i / (float) (h - 1);
-            int row = lerpColor(theme.bgTop(), theme.bgBottom(), t);
-            context.fill(x, y + i, x + w, y + i + 1, row);
-        }
+        context.fillGradient(x, y, x + w, y + h, theme.bgTop(), theme.bgBottom());
     }
 
     // --- Separators ---
