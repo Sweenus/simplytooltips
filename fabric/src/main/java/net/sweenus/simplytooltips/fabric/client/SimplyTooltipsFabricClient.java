@@ -21,7 +21,7 @@ public final class SimplyTooltipsFabricClient implements ClientModInitializer {
                 .registerReloadListener(new SimpleSynchronousResourceReloadListener() {
                     @Override
                     public Identifier getFabricId() {
-                        return Identifier.of(SimplyTooltips.MOD_ID, "themes");
+                        return new Identifier(SimplyTooltips.MOD_ID, "themes");
                     }
 
                     @Override
@@ -34,7 +34,7 @@ public final class SimplyTooltipsFabricClient implements ClientModInitializer {
                 .registerReloadListener(new SimpleSynchronousResourceReloadListener() {
                     @Override
                     public Identifier getFabricId() {
-                        return Identifier.of(SimplyTooltips.MOD_ID, "item_themes");
+                        return new Identifier(SimplyTooltips.MOD_ID, "item_themes");
                     }
 
                     @Override

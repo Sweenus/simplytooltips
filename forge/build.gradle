@@ -4,7 +4,13 @@ plugins {
 
 architectury {
     platformSetupLoomIde()
-    fabric()
+    forge()
+}
+
+loom {
+    forge {
+        mixinConfig 'simplytooltips.mixins.json'
+    }
 }
 
 configurations {
@@ -12,36 +18,55 @@ configurations {
     shadowCommon
     compileClasspath.extendsFrom common
     runtimeClasspath.extendsFrom common
-    developmentFabric.extendsFrom common
+    developmentForge.extendsFrom common
+}
+
+sourceSets {
+    main {
+        output.resourcesDir = java.destinationDirectory.get().asFile
+    }
 }
 
 repositories {
     maven {
+        name = 'MinecraftForge'
+        url = 'https://maven.minecraftforge.net/'
+    }
+    maven {
         name = 'FzzyMaven'
         url = 'https://maven.fzzyhmstrs.me/'
+    }
+    maven {
+        name = 'KotlinForForge'
+        url = 'https://thedarkcolour.github.io/KotlinForForge/'
     }
 }
 
 dependencies {
-    modImplementation "net.fabricmc:fabric-loader:$rootProject.fabric_loader_version"
-    modApi "net.fabricmc.fabric-api:fabric-api:$rootProject.fabric_api_version"
-    modApi "dev.architectury:architectury-fabric:$rootProject.architectury_api_version"
-    modImplementation "me.fzzyhmstrs:fzzy_config:${project.fzz_config_version}"
+    forge "net.minecraftforge:forge:${rootProject.forge_version}"
+    modImplementation "dev.architectury:architectury-forge:${rootProject.architectury_api_version}"
+    modImplementation("me.fzzyhmstrs:fzzy_config:${project.fzz_config_forge_version}") {
+        exclude group: 'thedarkcolour', module: 'kotlinforforge-neoforge'
+    }
+    modImplementation "thedarkcolour:kfflang:${rootProject.kotlinforforge_version}"
+    modImplementation "thedarkcolour:kfflib:${rootProject.kotlinforforge_version}"
+    modImplementation "thedarkcolour:kffmod:${rootProject.kotlinforforge_version}"
     runtimeOnly "net.peanuuutz.tomlkt:tomlkt-jvm:${rootProject.tomlkt_version}"
 
     common(project(path: ':common', configuration: 'namedElements')) { transitive false }
-    shadowCommon(project(path: ':common', configuration: 'transformProductionFabric')) { transitive false }
+    shadowCommon(project(path: ':common', configuration: 'transformProductionForge')) { transitive = false }
 }
 
 processResources {
     inputs.property 'version', project.version
 
-    filesMatching('fabric.mod.json') {
+    filesMatching('META-INF/mods.toml') {
         expand version: project.version
     }
 }
 
 shadowJar {
+    exclude 'fabric.mod.json'
     exclude 'architectury.common.json'
 
     configurations = [project.configurations.shadowCommon]
@@ -49,7 +74,6 @@ shadowJar {
 }
 
 remapJar {
-    injectAccessWidener = true
     inputFile.set shadowJar.archiveFile
     dependsOn shadowJar
     archiveClassifier.set(null)
@@ -63,6 +87,7 @@ sourcesJar {
     def commonSources = project(':common').sourcesJar
     dependsOn commonSources
     from commonSources.archiveFile.map { zipTree(it) }
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
 
 components.java {
@@ -73,7 +98,7 @@ components.java {
 
 publishing {
     publications {
-        mavenFabric(MavenPublication) {
+        mavenForge(MavenPublication) {
             artifactId = rootProject.archives_name + '-' + project.name
             from components.java
         }

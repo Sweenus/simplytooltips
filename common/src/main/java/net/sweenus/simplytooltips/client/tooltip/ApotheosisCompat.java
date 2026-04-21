@@ -211,59 +211,7 @@ public final class ApotheosisCompat {
      */
     @SuppressWarnings("unchecked")
     private static List<String> buildSocketLines(ItemStack stack, boolean altDown) {
-        try {
-            // Look up Apotheosis DataComponent types by their registry ID.
-            var socketsType = Registries.DATA_COMPONENT_TYPE.get(
-                    Identifier.of("apotheosis", "sockets"));
-            var gemsType = Registries.DATA_COMPONENT_TYPE.get(
-                    Identifier.of("apotheosis", "socketed_gems"));
-
-            if (socketsType == null) return List.of(); // Apotheosis not loaded
-
-            Integer totalSockets = (Integer) stack.get(socketsType);
-            if (totalSockets == null || totalSockets <= 0) return List.of();
-
-            List<String> lines = new ArrayList<>();
-            lines.add(ModernTooltipModel.SECTION_MARKER + "Sockets");
-
-            // Avoid a direct ItemContainerContents import (the classpath may differ across
-            // loader platforms). ItemContainerContents does NOT implement Iterable — it exposes
-            // a stream() method instead. We call it reflectively so this code compiles and runs
-            // on both Fabric and NeoForge without a platform-specific import.
-            Object gemsObj = gemsType != null ? stack.get(gemsType) : null;
-            List<ItemStack> gemList = new ArrayList<>();
-            if (gemsObj != null) {
-                try {
-                    java.lang.reflect.Method streamMethod = gemsObj.getClass().getMethod("stream");
-                    @SuppressWarnings("unchecked")
-                    java.util.stream.Stream<Object> gemStream =
-                            (java.util.stream.Stream<Object>) streamMethod.invoke(gemsObj);
-                    gemStream.forEach(o -> {
-                        if (o instanceof ItemStack is) gemList.add(is);
-                    });
-                } catch (Exception ignored) {
-                    // stream() unavailable — gemList stays empty; all slots show as empty.
-                }
-            }
-
-            for (int slot = 0; slot < totalSockets; slot++) {
-                ItemStack gem = slot < gemList.size() ? gemList.get(slot) : ItemStack.EMPTY;
-                if (gem.isEmpty()) {
-                    lines.add(SOCKET_EMPTY + " Empty");
-                } else {
-                    lines.add(SOCKET_FILLED + " " + gem.getName().getString());
-                    // When Alt is held, append the gem's bullet bonus-effect lines indented
-                    if (altDown) {
-                        appendGemDescriptions(lines, stack, gem, slot);
-                    }
-                }
-            }
-
-            return lines;
-        } catch (Exception ignored) {
-            // Any reflection/cast failure → silently drop socket section.
-            return List.of();
-        }
+        return List.of();
     }
 
     /**

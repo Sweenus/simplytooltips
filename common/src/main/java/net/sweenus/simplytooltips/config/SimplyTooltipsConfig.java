@@ -13,7 +13,7 @@ public class SimplyTooltipsConfig extends Config {
             ConfigApiJava.registerAndLoadConfig(SimplyTooltipsConfig::new);
 
     public SimplyTooltipsConfig() {
-        super(Identifier.of("simplytooltips", "config"));
+        super(new Identifier("simplytooltips", "config"));
     }
 
     /** Master switch for all Simply Tooltips custom tooltip rendering. */

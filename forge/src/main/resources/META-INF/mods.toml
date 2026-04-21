@@ -1,5 +1,5 @@
 modLoader = "javafml"
-loaderVersion = "[2,)"
+loaderVersion = "[47,)"
 license = "Timefall Development License 1.2"
 
 [[mods]]
@@ -10,26 +10,25 @@ authors = "Sweenus"
 description = '''
 Modern data driven tooltip renderer for Simply mods. Optionally available for other vanilla and modded items.
 '''
-logoFile = "assets/simplytooltips/icon.png"
 
 [[dependencies.simplytooltips]]
-modId = "neoforge"
-type = "required"
-versionRange = "[21,)"
+modId = "forge"
+mandatory = true
+versionRange = "[47,)"
 ordering = "NONE"
 side = "BOTH"
 
 [[dependencies.simplytooltips]]
 modId = "minecraft"
-type = "required"
-versionRange = "[1.21.1,)"
+mandatory = true
+versionRange = "[1.20.1,)"
 ordering = "NONE"
 side = "BOTH"
 
 [[dependencies.simplytooltips]]
 modId = "architectury"
-type = "required"
-versionRange = "[13.0.8,)"
+mandatory = true
+versionRange = "[9,)"
 ordering = "AFTER"
 side = "BOTH"
 

@@ -3,7 +3,6 @@ package net.sweenus.simplytooltips.client.render;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.component.type.AttributeModifiersComponent;
 import net.minecraft.entity.effect.StatusEffect;
 import net.minecraft.entity.effect.StatusEffectCategory;
 import net.minecraft.item.Item;
@@ -26,6 +25,7 @@ import net.sweenus.simplytooltips.config.SimplyTooltipsConfig;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.text.DecimalFormat;
 import java.util.List;
 import java.util.Locale;
 import java.util.regex.Matcher;
@@ -72,6 +72,7 @@ public class TooltipRenderer {
     private static final int AFFIX_POSITIVE_COLOR = 0xFF6FCB63;
     private static final int AFFIX_NEGATIVE_COLOR = 0xFFD05A4A;
     private static final int AFFIX_NEUTRAL_COLOR  = 0xFFB8742F;
+    private static final DecimalFormat DECIMAL_FORMAT = new DecimalFormat("#.##");
     private static volatile List<EffectNameEntry> STATUS_EFFECT_ENTRIES;
 
     // Lazily cached results of tr.getWidth() on constant strings — these never change at runtime.
@@ -1205,7 +1206,7 @@ public class TooltipRenderer {
 
     private static String formatStatValue(double value) {
         double rounded = Math.round(value * 10.0d) / 10.0d;
-        return AttributeModifiersComponent.DECIMAL_FORMAT.format(rounded);
+        return DECIMAL_FORMAT.format(rounded);
     }
 
     private static void drawInlineStatRow(DrawContext context, TextRenderer tr, InlineStatRow stat,

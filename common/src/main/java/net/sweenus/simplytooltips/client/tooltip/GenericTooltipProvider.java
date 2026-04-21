@@ -1,11 +1,10 @@
 package net.sweenus.simplytooltips.client.tooltip;
 
-import net.minecraft.component.type.AttributeModifierSlot;
-import net.minecraft.component.type.AttributeModifiersComponent;
+import com.google.common.collect.Multimap;
 import net.minecraft.entity.attribute.EntityAttributeModifier;
 import net.minecraft.entity.attribute.EntityAttributes;
+import net.minecraft.entity.EquipmentSlot;
 import net.minecraft.item.ItemStack;
-import net.minecraft.item.Item;
 import net.minecraft.text.Text;
 import net.minecraft.text.TextContent;
 import net.minecraft.text.TranslatableTextContent;
@@ -15,6 +14,7 @@ import net.sweenus.simplytooltips.api.TooltipProvider;
 import net.sweenus.simplytooltips.api.TooltipTheme;
 
 import java.util.ArrayList;
+import java.text.DecimalFormat;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -27,6 +27,7 @@ public final class GenericTooltipProvider implements TooltipProvider {
     private static final String ATTRIBUTE_MODIFIER_PREFIX = "attribute.modifier.";
     private static final String ATTACK_DAMAGE_KEY = "attribute.name.generic.attack_damage";
     private static final String ATTACK_SPEED_KEY = "attribute.name.generic.attack_speed";
+    private static final DecimalFormat DECIMAL_FORMAT = new DecimalFormat("#.##");
 
     @Override
     public boolean supports(ItemStack stack) {
@@ -80,16 +81,18 @@ public final class GenericTooltipProvider implements TooltipProvider {
         HeaderStat attackDamage = HeaderStat.missing();
         HeaderStat attackSpeed = HeaderStat.missing();
 
-        stack.applyAttributeModifier(AttributeModifierSlot.MAINHAND, (attribute, modifier) -> {
-            if (attribute.matches(EntityAttributes.GENERIC_ATTACK_DAMAGE)) {
-                double value = displayedAttributeValue(attribute.matches(EntityAttributes.GENERIC_ATTACK_DAMAGE), modifier);
-                int priority = modifierPriority(modifier, Item.BASE_ATTACK_DAMAGE_MODIFIER_ID);
+        Multimap<net.minecraft.entity.attribute.EntityAttribute, EntityAttributeModifier> attributes =
+                stack.getAttributeModifiers(EquipmentSlot.MAINHAND);
+        attributes.forEach((attribute, modifier) -> {
+            if (attribute.equals(EntityAttributes.GENERIC_ATTACK_DAMAGE)) {
+                double value = displayedAttributeValue(attribute.equals(EntityAttributes.GENERIC_ATTACK_DAMAGE), modifier);
+                int priority = modifierPriority(modifier);
                 if (priority > attackDamage.priority()) {
                     attackDamage.replace(value, priority);
                 }
-            } else if (attribute.matches(EntityAttributes.GENERIC_ATTACK_SPEED)) {
-                double value = displayedAttributeValue(attribute.matches(EntityAttributes.GENERIC_ATTACK_SPEED), modifier);
-                int priority = modifierPriority(modifier, Item.BASE_ATTACK_SPEED_MODIFIER_ID);
+            } else if (attribute.equals(EntityAttributes.GENERIC_ATTACK_SPEED)) {
+                double value = displayedAttributeValue(attribute.equals(EntityAttributes.GENERIC_ATTACK_SPEED), modifier);
+                int priority = modifierPriority(modifier);
                 if (priority > attackSpeed.priority()) {
                     attackSpeed.replace(value, priority);
                 }
@@ -106,24 +109,21 @@ public final class GenericTooltipProvider implements TooltipProvider {
         );
     }
 
-    private static int modifierPriority(EntityAttributeModifier modifier, net.minecraft.util.Identifier baseModifierId) {
-        if (modifier.idMatches(baseModifierId)) return 3;
-        if (modifier.operation() == EntityAttributeModifier.Operation.ADD_VALUE) return 2;
+    private static int modifierPriority(EntityAttributeModifier modifier) {
+        if (modifier.getOperation() == EntityAttributeModifier.Operation.ADDITION) return 2;
         return 1;
     }
 
     private static double displayedAttributeValue(boolean isAttackAttribute, EntityAttributeModifier modifier) {
-        double value = modifier.value();
-        if (isAttackAttribute) {
-            if (modifier.idMatches(Item.BASE_ATTACK_DAMAGE_MODIFIER_ID)) {
-                value += EntityAttributes.GENERIC_ATTACK_DAMAGE.value().getDefaultValue();
-            } else if (modifier.idMatches(Item.BASE_ATTACK_SPEED_MODIFIER_ID)) {
-                value += EntityAttributes.GENERIC_ATTACK_SPEED.value().getDefaultValue();
-            }
+        double value = modifier.getValue();
+        if (isAttackAttribute && modifier.getOperation() == EntityAttributeModifier.Operation.ADDITION) {
+            value += modifier.getName().contains("attack_speed")
+                    ? EntityAttributes.GENERIC_ATTACK_SPEED.getDefaultValue()
+                    : EntityAttributes.GENERIC_ATTACK_DAMAGE.getDefaultValue();
         }
 
-        if (modifier.operation() == EntityAttributeModifier.Operation.ADD_MULTIPLIED_BASE
-                || modifier.operation() == EntityAttributeModifier.Operation.ADD_MULTIPLIED_TOTAL) {
+        if (modifier.getOperation() == EntityAttributeModifier.Operation.MULTIPLY_BASE
+                || modifier.getOperation() == EntityAttributeModifier.Operation.MULTIPLY_TOTAL) {
             return value * 100.0;
         }
         return value;
@@ -134,10 +134,10 @@ public final class GenericTooltipProvider implements TooltipProvider {
 
         List<String> parts = new ArrayList<>(2);
         if (stats.attackDamage() != null) {
-            parts.add("\uD83D\uDDE1 " + AttributeModifiersComponent.DECIMAL_FORMAT.format(stats.attackDamage()));
+            parts.add("\uD83D\uDDE1 " + DECIMAL_FORMAT.format(stats.attackDamage()));
         }
         if (stats.attackSpeed() != null) {
-            parts.add("\u231B " + AttributeModifiersComponent.DECIMAL_FORMAT.format(stats.attackSpeed()));
+            parts.add("\u231B " + DECIMAL_FORMAT.format(stats.attackSpeed()));
         }
         return parts.isEmpty() ? null : Text.literal(String.join("   ", parts));
     }

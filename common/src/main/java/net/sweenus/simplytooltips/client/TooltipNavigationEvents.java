@@ -9,7 +9,7 @@ import org.lwjgl.glfw.GLFW;
 
 /**
  * Registers cross-platform (Architectury) input and tick events for tooltip navigation.
- * Called from both {@code SimplyTooltipsFabricClient} and {@code SimplyTooltipsNeoForgeClient}.
+ * Called from both {@code SimplyTooltipsFabricClient} and {@code SimplyTooltipsForgeClient}.
  */
 public class TooltipNavigationEvents {
 

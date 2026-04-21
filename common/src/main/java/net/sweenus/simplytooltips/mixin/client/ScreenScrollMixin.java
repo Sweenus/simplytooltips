@@ -14,7 +14,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * is active, the scroll delta is routed to {@link ScrollState} and the event is consumed
  * (preventing hotbar slot changes or screen scroll from firing simultaneously).
  *
- * <p>Targets {@code Mouse#onMouseScroll(JDD)V} (Yarn name in MC 1.21.1; intermediary: {@code method_1598}).
+ * <p>Targets {@code Mouse#onMouseScroll(JDD)V} (Yarn name in MC 1.20.1; intermediary: {@code method_1598}).
  * Targeting {@code Screen#mouseScrolled} crashes because Screen does not directly declare that
  * method — it only inherits it from the {@code Element} interface.
  */

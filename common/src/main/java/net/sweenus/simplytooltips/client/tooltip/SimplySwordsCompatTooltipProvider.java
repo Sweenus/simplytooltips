@@ -31,7 +31,7 @@ import java.util.List;
 public final class SimplySwordsCompatTooltipProvider implements TooltipProvider {
 
     public static final TagKey<Item> SIMPLY_SWORDS_COMPAT_TAG = TagKey.of(
-            RegistryKeys.ITEM, Identifier.of("simplytooltips", "simply_swords_compat")
+            RegistryKeys.ITEM, new Identifier("simplytooltips", "simply_swords_compat")
     );
 
     /**
