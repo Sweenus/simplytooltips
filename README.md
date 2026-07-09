@@ -93,7 +93,7 @@ These are the built-in values you can reuse in your own theme JSON.
 ### `motif`
 
 - `none`
-- `vine`, `ember`, `enchanted`, `bee`, `blossom`, `bubble`, `earth`, `echo`, `ice`, `lightning`, `autumn`, `soul`, `deepdark`, `poison`, `ocean`, `rustic`, `honey`, `jade`, `wood`, `stone`, `iron`, `gold`, `diamond`, `netherite`, `runic`
+- `vine`, `ember`, `enchanted`, `bee`, `blossom`, `bubble`, `earth`, `echo`, `cosmic`, `ice`, `lightning`, `autumn`, `soul`, `deepdark`, `poison`, `ocean`, `rustic`, `honey`, `jade`, `wood`, `stone`, `iron`, `gold`, `diamond`, `netherite`, `runic`
 
 ### `itemAnimStyle`
 
@@ -134,7 +134,7 @@ These are the built-in values you can reuse in your own theme JSON.
 
 Built-in theme keys you can reference directly:
 
-- `autumn`, `bee`, `blossom`, `bubble`, `deepdark`, `default`, `diamond`, `earth`, `echo`, `ember`, `enchanted`, `gold`, `honey`, `ice`, `iron`, `jade`, `lightning`, `netherite`, `obfuscated`, `ocean`, `poison`, `rarity_common`, `rarity_epic`, `rarity_rare`, `rarity_uncommon`, `runic`, `rustic`, `soul`, `stone`, `unstable`, `vine`, `wood`
+- `autumn`, `bee`, `blossom`, `bubble`, `cosmic`, `deepdark`, `default`, `diamond`, `earth`, `echo`, `ember`, `enchanted`, `gold`, `honey`, `ice`, `iron`, `jade`, `lightning`, `netherite`, `obfuscated`, `ocean`, `poison`, `rarity_common`, `rarity_epic`, `rarity_rare`, `rarity_uncommon`, `runic`, `rustic`, `soul`, `stone`, `unstable`, `vine`, `wood`
 
 ## 6) Reload and Test
 
