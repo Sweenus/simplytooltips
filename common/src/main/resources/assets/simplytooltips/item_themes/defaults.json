@@ -128,7 +128,7 @@
     { "tag": "minecraft:pickaxes",  "badges": ["PICKAXE"] },
     { "tag": "minecraft:shovels",   "badges": ["SHOVEL"]  },
     { "tag": "minecraft:arrows",    "badges": ["ARROW"]   },
-    { "tag": "minecraft:hoes",      "theme": "vine",      "badges": ["HOE"]     },
+    { "tag": "minecraft:hoes",      "badges": ["HOE"]     },
     { "tag": "minecraft:tridents",  "theme": "bubble",    "badges": ["TRIDENT"] },
 
     { "tag": "c:arrows",              "badges": ["ARROW"]   },

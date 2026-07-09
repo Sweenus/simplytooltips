@@ -109,7 +109,7 @@ public abstract class DrawContextMixin {
         if (title == null || title.isBlank()) return ItemStack.EMPTY;
 
         if (!simplytooltips$lastRealStack.isEmpty()
-                && simplytooltips$lastRealStack.getName().getString().equals(title)) {
+                && title.equals(simplytooltips$safeStackName(simplytooltips$lastRealStack))) {
             return simplytooltips$lastRealStack;
         }
 
@@ -129,7 +129,7 @@ public abstract class DrawContextMixin {
                     Slot slot = (Slot) simplytooltips$cachedFocusedSlotField.get(handledScreen);
                     if (slot != null && slot.hasStack()) {
                         ItemStack slotStack = slot.getStack();
-                        if (slotStack.getName().getString().equals(title)) {
+                        if (title.equals(simplytooltips$safeStackName(slotStack))) {
                             return slotStack;
                         }
                     }
@@ -140,7 +140,7 @@ public abstract class DrawContextMixin {
         // 3. Cursor / held stack
         if (client.player != null) {
             ItemStack cursorStack = client.player.currentScreenHandler.getCursorStack();
-            if (!cursorStack.isEmpty() && cursorStack.getName().getString().equals(title)) {
+            if (!cursorStack.isEmpty() && title.equals(simplytooltips$safeStackName(cursorStack))) {
                 return cursorStack;
             }
         }
@@ -148,7 +148,7 @@ public abstract class DrawContextMixin {
         if (client.currentScreen instanceof MerchantScreen merchantScreen) {
             for (TradeOffer offer : merchantScreen.getScreenHandler().getRecipes()) {
                 ItemStack sellItem = offer.getSellItem();
-                if (!sellItem.isEmpty() && sellItem.getName().getString().equals(title)) {
+                if (!sellItem.isEmpty() && title.equals(simplytooltips$safeStackName(sellItem))) {
                     return sellItem;
                 }
             }
@@ -165,7 +165,10 @@ public abstract class DrawContextMixin {
             Map<String, ItemStack> lookup = new HashMap<>();
             for (Item item : Registries.ITEM) {
                 ItemStack candidate = new ItemStack(item);
-                lookup.put(candidate.getName().getString(), candidate);
+                String candidateName = simplytooltips$safeStackName(candidate);
+                if (candidateName != null && !candidateName.isBlank()) {
+                    lookup.put(candidateName, candidate);
+                }
             }
             simplytooltips$itemNameLookup = lookup;
         }
@@ -174,6 +177,15 @@ public abstract class DrawContextMixin {
         // Cache the result — including EMPTY — so this title is never looked up again.
         simplytooltips$nameToStackCache.put(title, found);
         return found;
+    }
+
+    @Unique
+    private static String simplytooltips$safeStackName(ItemStack stack) {
+        try {
+            return stack != null && !stack.isEmpty() ? stack.getName().getString() : null;
+        } catch (Throwable ignored) {
+            return null;
+        }
     }
 
     @Unique
