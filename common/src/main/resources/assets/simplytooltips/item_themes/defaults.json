@@ -122,6 +122,13 @@
     "simplybows:upgrades/reinforced_bow_frame":             { "theme": "autumn",    "badges": ["UPGRADE"] },
     "simplybows:upgrades/enchanted_bow_string":             { "theme": "autumn",    "badges": ["UPGRADE"] }
   },
+  "components": [
+    { "component": "apotheosis:rarity=apotheosis:common",   "theme": "rarity_common",   "badges": ["COMMON"]   },
+    { "component": "apotheosis:rarity=apotheosis:uncommon", "theme": "rarity_uncommon", "badges": ["UNCOMMON"] },
+    { "component": "apotheosis:rarity=apotheosis:rare",     "theme": "rarity_rare",     "badges": ["RARE"]     },
+    { "component": "apotheosis:rarity=apotheosis:epic",     "theme": "rarity_epic",     "badges": ["EPIC"]     },
+    { "component": "apotheosis:rarity=apotheosis:mythic",   "theme": "rarity_mythic",   "badges": ["MYTHIC"]   }
+  ],
   "tags": [
     { "tag": "minecraft:swords",    "badges": ["SWORD"]   },
     { "tag": "minecraft:axes",      "badges": ["AXE"]     },

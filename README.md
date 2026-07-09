@@ -72,6 +72,22 @@ Create `assets/simplytooltips/item_themes/my_mappings.json`.
       "badges": ["SWORD", "CUSTOM"]
     }
   },
+  "components": [
+    {
+      "component": "mod:rarity",
+      "value": "mod:rare",
+      "theme": "my_theme",
+      "badges": ["RARE"]
+    },
+    {
+      "component": "mod:charged=true",
+      "theme": "my_theme"
+    },
+    {
+      "component": "mod:has_socket",
+      "badges": ["SOCKETED"]
+    }
+  ],
   "tags": [
     {
       "tag": "minecraft:swords",
@@ -83,8 +99,21 @@ Create `assets/simplytooltips/item_themes/my_mappings.json`.
 ```
 
 How it resolves:
-- Exact item match in `items` wins.
-- If no exact item match, first matching `tags` entry is used.
+- First matching `components` entry with a theme wins.
+- If no component theme matches, exact item matches in `items` win.
+- If no exact item theme matches, provider-supplied themes are used.
+- If no provider theme exists, first matching `tags` entry with a theme is used.
+- If nothing matches, vanilla rarity fallback is used.
+
+Badge overrides resolve separately:
+- First matching `components` entry with badges wins.
+- If none matches, exact item badges win.
+- If none matches, first matching `tags` entry with badges wins.
+- If nothing matches, provider/default badges are used.
+
+Component entries use Minecraft data component IDs. Add `value` to match a specific
+component value, omit `value` to match component presence only, or use shorthand
+`"component": "namespace:component_id=namespace:value_id"`.
 
 ## 4) Available Preset Theme Elements
 
@@ -134,7 +163,7 @@ These are the built-in values you can reuse in your own theme JSON.
 
 Built-in theme keys you can reference directly:
 
-- `autumn`, `bee`, `blossom`, `bubble`, `cosmic`, `deepdark`, `default`, `diamond`, `earth`, `echo`, `ember`, `enchanted`, `gold`, `honey`, `ice`, `iron`, `jade`, `lightning`, `netherite`, `obfuscated`, `ocean`, `poison`, `rarity_common`, `rarity_epic`, `rarity_rare`, `rarity_uncommon`, `runic`, `rustic`, `soul`, `stone`, `unstable`, `vine`, `wood`
+- `autumn`, `bee`, `blossom`, `bubble`, `cosmic`, `deepdark`, `default`, `diamond`, `earth`, `echo`, `ember`, `enchanted`, `gold`, `honey`, `ice`, `iron`, `jade`, `lightning`, `netherite`, `obfuscated`, `ocean`, `poison`, `rarity_common`, `rarity_epic`, `rarity_mythic`, `rarity_rare`, `rarity_uncommon`, `runic`, `rustic`, `soul`, `stone`, `unstable`, `vine`, `wood`
 
 ## 6) Reload and Test
 

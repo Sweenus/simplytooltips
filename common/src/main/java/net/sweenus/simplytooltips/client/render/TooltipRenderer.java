@@ -166,7 +166,7 @@ public class TooltipRenderer {
             builtModel  = ApotheosisCompat.augment(builtModel, rawLines, stack, altDown);
             model       = builtModel;
 
-            // Resolve theme via priority chain: provider key > item/tag data > rarity
+            // Resolve theme via priority chain: component > item > provider > tag > rarity
             ThemeDefinition builtDef = resolveTheme(stack, model);
             resolvedDef  = builtDef;
             final String motifStr = resolvedDef.motif();
@@ -1014,7 +1014,8 @@ public class TooltipRenderer {
     /**
      * Resolves the {@link ThemeDefinition} to use for this tooltip using the priority chain:
      * <ol>
-     *   <li>Exact per-item mapping from {@link ItemThemeRegistry} (hard override)</li>
+     *   <li>Component mapping from {@link ItemThemeRegistry}</li>
+     *   <li>Exact per-item mapping from {@link ItemThemeRegistry}</li>
      *   <li>Provider-supplied {@code model.themeKey()} (e.g. mod-specific defaults)</li>
      *   <li>Per-tag mapping from {@link ItemThemeRegistry}</li>
      *   <li>Vanilla item rarity (common / uncommon / rare / epic)</li>
@@ -1022,21 +1023,26 @@ public class TooltipRenderer {
      * </ol>
      */
     private static ThemeDefinition resolveTheme(ItemStack stack, ModernTooltipModel model) {
-        // 1. Data-driven exact item mapping (always wins)
+        // 1. Data-driven component mapping (always wins)
+        String componentDataKey = ItemThemeRegistry.resolveComponentThemeForStack(stack);
+        if (componentDataKey != null)
+            return ThemeRegistry.get(componentDataKey);
+
+        // 2. Data-driven exact item mapping
         String itemDataKey = ItemThemeRegistry.resolveItemThemeForStack(stack);
         if (itemDataKey != null)
             return ThemeRegistry.get(itemDataKey);
 
-        // 2. Provider-supplied default
+        // 3. Provider-supplied default
         if (model.themeKey() != null)
             return ThemeRegistry.get(model.themeKey());
 
-        // 3. Data-driven tag mapping
+        // 4. Data-driven tag mapping
         String tagDataKey = ItemThemeRegistry.resolveTagThemeForStack(stack);
         if (tagDataKey != null)
             return ThemeRegistry.get(tagDataKey);
 
-        // 4. Rarity fallback
+        // 5. Rarity fallback
         Rarity rarity = stack.getRarity();
         return ThemeRegistry.get(rarityThemeKey(rarity != null ? rarity : Rarity.COMMON));
     }
