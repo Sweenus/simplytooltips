@@ -3,11 +3,14 @@ package net.sweenus.simplytooltips.client.tooltip;
 import net.minecraft.item.ItemStack;
 import net.minecraft.registry.Registries;
 import net.minecraft.text.Text;
+import net.minecraft.text.TextContent;
+import net.minecraft.text.TranslatableTextContent;
 import net.minecraft.util.Identifier;
 import net.sweenus.simplytooltips.api.ModernTooltipModel;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Predicate;
 
 /**
  * Post-processes a {@link ModernTooltipModel} to properly surface Apotheosis
@@ -18,6 +21,7 @@ import java.util.List;
  *   <li>Apotheosis affix effect lines — plain-text bullet lines (U+2022 •) injected by
  *       {@code ItemTooltipEvent}. rawLines is used as the authoritative source.</li>
  *   <li>"Can be Imbued" lines — Apotheosis imbue indicator.</li>
+ *   <li>Additional attribute modifier lines added by Apotheosis affixes/gems/imbues.</li>
  *   <li>Socket summary — replaces the {@code "APOTH_SOCKET_MARKER"} sentinel injected by
  *       Apotheosis's {@code AddAttributeTooltipsEvent} handler.</li>
  * </ul>
@@ -29,8 +33,8 @@ import java.util.List;
  *   <li>Strip Apotheosis lines from {@code abilityLines} (LORE tab), {@code bodyLines} (STATS tab),
  *       and the socket-marker sentinel from {@code extraLines} so each section stays clean.</li>
  *   <li>Build {@code affixLines}: affix bullets separated by subtle {@link ModernTooltipModel#AFFIX_DIVIDER}
- *       lines under a {@code SECTION_MARKER+"Affixes"} header, followed by a socket summary section
- *       if sockets are present.</li>
+ *       lines under a {@code SECTION_MARKER+"Affixes"} header, followed by any bonus attributes
+ *       and a socket summary section if present.</li>
  * </ol>
  *
  * <p>This class carries no compile-time dependency on the Apotheosis API. All detection is
@@ -52,6 +56,11 @@ public final class ApotheosisCompat {
 
     /** Sentinel injected by Apotheosis {@code AddAttributeTooltipsEvent} for socket rendering. */
     private static final String APOTH_SOCKET_MARKER = "APOTH_SOCKET_MARKER";
+
+    private static final String SLOT_HEADER_PREFIX = "item.modifiers.";
+    private static final String ATTRIBUTE_MODIFIER_PREFIX = "attribute.modifier.";
+    private static final String ATTACK_DAMAGE_KEY = "attribute.name.generic.attack_damage";
+    private static final String ATTACK_SPEED_KEY = "attribute.name.generic.attack_speed";
 
     private ApotheosisCompat() {}
 
@@ -99,16 +108,24 @@ public final class ApotheosisCompat {
                                              ItemStack stack,
                                              boolean altDown) {
         List<String> affixGroup = collectAffixLines(rawLines);
+        List<String> attributeGroup = collectBonusAttributeLines(rawLines);
+        List<String> normalizedAttributeGroup = normalizeLines(attributeGroup);
+        List<String> attributeSlotHeaders = collectAttributeSlotHeaderLines(rawLines);
         boolean      hasSocket  = hasSocketMarker(rawLines);
 
-        if (affixGroup.isEmpty() && !hasSocket) return model;
+        if (affixGroup.isEmpty() && attributeGroup.isEmpty() && !hasSocket) return model;
 
         // Strip Apotheosis lines from abilityLines so the LORE tab stays clean.
         // (SimplySwordsCompatTooltipProvider can collect affix bullets into abilityLines.)
         List<String> cleanedAbility = new ArrayList<>(model.abilityLines().size());
         for (String line : model.abilityLines()) {
-            if (!isApotheosisLine(line)) cleanedAbility.add(line);
+            if (!isApotheosisLine(line)
+                    && !APOTH_SOCKET_MARKER.equals(line)
+                    && !containsNormalized(normalizedAttributeGroup, line)
+                    && !isAttributeContextLine(line, attributeSlotHeaders))
+                cleanedAbility.add(line);
         }
+        removeEmptySection(cleanedAbility, "Enchantments");
         trimTrailingBlanks(cleanedAbility);
 
         // Strip Apotheosis lines from bodyLines so the STATS tab stays clean.
@@ -117,9 +134,13 @@ public final class ApotheosisCompat {
         // We also drop APOTH_SOCKET_MARKER which ends up in bodyLines for some items.
         List<String> cleanedBody = new ArrayList<>(model.bodyLines().size());
         for (String line : model.bodyLines()) {
-            if (!isApotheosisLine(line) && !APOTH_SOCKET_MARKER.equals(line))
+            if (!isApotheosisLine(line)
+                    && !APOTH_SOCKET_MARKER.equals(line)
+                    && !containsNormalized(normalizedAttributeGroup, line)
+                    && !isAttributeContextLine(line, attributeSlotHeaders))
                 cleanedBody.add(line);
         }
+        removeEmptySection(cleanedBody, "Enchantments");
         trimTrailingBlanks(cleanedBody);
 
         // Strip APOTH_SOCKET_MARKER from extraLines.
@@ -127,10 +148,14 @@ public final class ApotheosisCompat {
         // which lands in extraLines for attribute-carrying items.
         List<Text> cleanedExtra = new ArrayList<>(model.extraLines().size());
         for (Text t : model.extraLines()) {
-            if (!APOTH_SOCKET_MARKER.equals(t.getString())) cleanedExtra.add(t);
+            String s = t.getString();
+            if (!APOTH_SOCKET_MARKER.equals(s)
+                    && !containsNormalized(normalizedAttributeGroup, s)
+                    && !isAttributeContextLine(s, attributeSlotHeaders))
+                cleanedExtra.add(t);
         }
 
-        // Build affixLines: affix-bullet section + optional socket section.
+        // Build affixLines: affix-bullet section + optional attribute/socket sections.
         List<String> newAffixLines = new ArrayList<>();
 
         if (!affixGroup.isEmpty()) {
@@ -143,6 +168,11 @@ public final class ApotheosisCompat {
                     newAffixLines.add(ModernTooltipModel.AFFIX_DIVIDER);
                 }
             }
+        }
+
+        if (!attributeGroup.isEmpty()) {
+            newAffixLines.add(ModernTooltipModel.SECTION_MARKER + "Attributes");
+            newAffixLines.addAll(attributeGroup);
         }
 
         if (hasSocket) {
@@ -185,6 +215,73 @@ public final class ApotheosisCompat {
             if (!s.isEmpty() && s.charAt(0) == SECTION_DIAMOND) break;
             if (isApotheosisLine(s)) result.add(s);
         }
+        return result;
+    }
+
+    /** Collects displayed equipment slot headers such as "When in Main Hand:" from raw lines. */
+    private static List<String> collectAttributeSlotHeaderLines(List<Text> rawLines) {
+        List<String> result = new ArrayList<>();
+        for (int i = 1; i < rawLines.size(); i++) {
+            Text line = rawLines.get(i);
+            if (hasTranslatableKey(line, key -> key.startsWith(SLOT_HEADER_PREFIX))) {
+                result.add(line.getString());
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Collects non-base attribute rows from vanilla equipment modifier blocks.
+     *
+     * <p>Apotheosis appends affix/gem/imbue bonuses into the same slot sections used by vanilla
+     * item attributes. The first attack damage and attack speed rows in a section are usually the
+     * base weapon stats that Simply Tooltips already summarizes elsewhere, so only subsequent
+     * attack rows and all other attributes are mirrored into the AFFIXES tab.
+     */
+    private static List<String> collectBonusAttributeLines(List<Text> rawLines) {
+        List<String> result = new ArrayList<>();
+        boolean inAttributeBlock = false;
+        boolean skippedBaseAttackDamage = false;
+        boolean skippedBaseAttackSpeed = false;
+
+        for (int i = 1; i < rawLines.size(); i++) {
+            Text line = rawLines.get(i);
+            String s = line.getString();
+
+            if (!s.isEmpty() && s.charAt(0) == SECTION_DIAMOND) {
+                inAttributeBlock = false;
+                continue;
+            }
+
+            if (hasTranslatableKey(line, key -> key.startsWith(SLOT_HEADER_PREFIX))) {
+                inAttributeBlock = true;
+                skippedBaseAttackDamage = false;
+                skippedBaseAttackSpeed = false;
+                continue;
+            }
+
+            if (!inAttributeBlock) continue;
+
+            if (s.isBlank()) {
+                inAttributeBlock = false;
+                continue;
+            }
+            if (APOTH_SOCKET_MARKER.equals(s)) continue;
+
+            if (!isAttributeModifierLine(line)) continue;
+
+            if (isAttackDamageLine(line) && !skippedBaseAttackDamage) {
+                skippedBaseAttackDamage = true;
+                continue;
+            }
+            if (isAttackSpeedLine(line) && !skippedBaseAttackSpeed) {
+                skippedBaseAttackSpeed = true;
+                continue;
+            }
+
+            result.add(s);
+        }
+
         return result;
     }
 
@@ -319,6 +416,109 @@ public final class ApotheosisCompat {
         } catch (Exception ignored) {
             return value.toString();
         }
+    }
+
+    private static boolean isAttributeContextLine(String line, List<String> attributeSlotHeaders) {
+        if (line == null) return false;
+        if (attributeSlotHeaders.contains(line)) return true;
+
+        String s = stripSectionMarker(line).replace('\u00A0', ' ').trim();
+        if (s.isEmpty()) return false;
+        String lower = s.toLowerCase(java.util.Locale.ROOT);
+        return lower.equals("when held:")
+                || (lower.startsWith("when in ") && lower.endsWith(":"));
+    }
+
+    private static List<String> normalizeLines(List<String> lines) {
+        List<String> result = new ArrayList<>(lines.size());
+        for (String line : lines) {
+            result.add(normalizeLine(line));
+        }
+        return result;
+    }
+
+    private static boolean containsNormalized(List<String> normalizedLines, String line) {
+        return normalizedLines.contains(normalizeLine(line));
+    }
+
+    private static String normalizeLine(String line) {
+        return stripSectionMarker(line).replace('\u00A0', ' ').trim();
+    }
+
+    private static void removeEmptySection(List<String> lines, String sectionTitle) {
+        for (int i = 0; i < lines.size(); i++) {
+            String line = lines.get(i);
+            if (!isSection(line, sectionTitle)) continue;
+
+            boolean hasContent = false;
+            for (int j = i + 1; j < lines.size(); j++) {
+                String next = lines.get(j);
+                if (next != null && next.startsWith(ModernTooltipModel.SECTION_MARKER)) break;
+                if (next != null && !next.isBlank()) {
+                    hasContent = true;
+                    break;
+                }
+            }
+
+            if (!hasContent) {
+                lines.remove(i);
+                while (i < lines.size() && lines.get(i).isBlank()) {
+                    lines.remove(i);
+                }
+                i--;
+            }
+        }
+    }
+
+    private static boolean isSection(String line, String sectionTitle) {
+        String s = stripSectionMarker(line).replace('\u00A0', ' ').trim();
+        if (s.startsWith("\u25C6")) s = s.substring(1).trim();
+        return s.equalsIgnoreCase(sectionTitle);
+    }
+
+    private static String stripSectionMarker(String line) {
+        if (line == null) return "";
+        return line.startsWith(ModernTooltipModel.SECTION_MARKER)
+                ? line.substring(ModernTooltipModel.SECTION_MARKER.length())
+                : line;
+    }
+
+    private static boolean isAttributeModifierLine(Text line) {
+        return hasTranslatableKey(line, key -> key.startsWith(ATTRIBUTE_MODIFIER_PREFIX));
+    }
+
+    private static boolean isAttackDamageLine(Text line) {
+        return hasTranslatableKey(line, key -> ATTACK_DAMAGE_KEY.equals(key));
+    }
+
+    private static boolean isAttackSpeedLine(Text line) {
+        return hasTranslatableKey(line, key -> ATTACK_SPEED_KEY.equals(key));
+    }
+
+    private static boolean hasTranslatableKey(Text text, Predicate<String> matcher) {
+        if (text == null) return false;
+        return hasTranslatableKey0(text, matcher, 0);
+    }
+
+    private static boolean hasTranslatableKey0(Text text, Predicate<String> matcher, int depth) {
+        if (depth > 8) return false;
+
+        TextContent content = text.getContent();
+        if (content instanceof TranslatableTextContent translatable) {
+            if (matcher.test(translatable.getKey())) return true;
+            for (Object arg : translatable.getArgs()) {
+                if (arg instanceof Text nested && hasTranslatableKey0(nested, matcher, depth + 1)) {
+                    return true;
+                }
+            }
+        }
+
+        for (Text sibling : text.getSiblings()) {
+            if (hasTranslatableKey0(sibling, matcher, depth + 1)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** Removes trailing blank strings from {@code list} in-place. */
