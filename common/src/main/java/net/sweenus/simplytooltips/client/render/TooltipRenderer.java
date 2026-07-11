@@ -1309,6 +1309,7 @@ public class TooltipRenderer {
     private static AbilitySectionData prepareAbilitySection(ItemStack stack, List<String> abilityLines) {
         List<String> lines = new ArrayList<>(abilityLines);
         String header = DEFAULT_ABILITY_HEADER;
+        String extractedAbilityHeader = null;
 
         if (!stack.isIn(SIMPLY_SWORDS_COMPAT_TAG)) {
             return new AbilitySectionData(header, lines);
@@ -1328,13 +1329,38 @@ public class TooltipRenderer {
 
             String abilityName = matcher.group(1).trim();
             if (!abilityName.isEmpty()) {
-                header = abilityName;
+                extractedAbilityHeader = abilityName;
                 lines.remove(i);
             }
             break;
         }
 
+        if (startsWithImplicitSection(lines)) {
+            header = "Implicit";
+            lines.remove(0);
+            if (extractedAbilityHeader != null) {
+                int insertIndex = Math.min(1, lines.size());
+                lines.add(insertIndex, ModernTooltipModel.SECTION_MARKER + extractedAbilityHeader);
+            } else if (hasDescriptionAfterImplicit(lines)) {
+                lines.add(1, ModernTooltipModel.SECTION_MARKER + DEFAULT_ABILITY_HEADER);
+            }
+        } else if (extractedAbilityHeader != null) {
+            header = extractedAbilityHeader;
+        }
+
         return new AbilitySectionData(header, lines);
+    }
+
+    private static boolean startsWithImplicitSection(List<String> lines) {
+        if (lines.isEmpty() || lines.get(0) == null || !lines.get(0).startsWith(ModernTooltipModel.SECTION_MARKER)) {
+            return false;
+        }
+        return "Implicit".equals(lines.get(0).substring(ModernTooltipModel.SECTION_MARKER.length()).trim());
+    }
+
+    private static boolean hasDescriptionAfterImplicit(List<String> lines) {
+        return lines.size() > 1 && lines.get(1) != null && !lines.get(1).isBlank()
+                && !lines.get(1).startsWith(ModernTooltipModel.SECTION_MARKER);
     }
 
     private static boolean isSimplyBowsStack(ItemStack stack) {
