@@ -104,7 +104,7 @@
     "simplyswords:magispear":            { "theme": "deepdark",  "badges": ["UNIQUE", "SPEAR"]      },
     "simplyswords:enigma":               { "theme": "jade",      "badges": ["UNIQUE", "CLAYMORE"]   },
     "simplyswords:caelestis":            { "theme": "enchanted", "badges": ["UNIQUE", "CLAYMORE"]   },
-    "simplyswords:wraithfang":           { "theme": "echo",      "badges": ["UNIQUE", "DAGGER"]     },
+    "simplyswords:wraithfang":           { "theme": "echo",      "badges": ["UNIQUE", "CUTLASS"]    },
     "simplyswords:chompolotl":           { "theme": "bubble",    "badges": ["UNIQUE", "CHAKRAM"]    },
     "simplyswords:dreadtide":            { "theme": "bubble",    "badges": ["UNIQUE", "TWINBLADE"]  },
 
