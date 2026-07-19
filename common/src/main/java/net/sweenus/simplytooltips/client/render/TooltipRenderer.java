@@ -45,6 +45,8 @@ public class TooltipRenderer {
             "(?i)^.*?unique\\s+effect\\s*:\\s*(.+?)\\s*$"
     );
     private static final String DEFAULT_ABILITY_HEADER = "Description";
+    private static final String COOLDOWN_LINE_PREFIX = "\u231B";
+    private static final int COOLDOWN_TEXT_COLOR = 0xF6A23A;
     // Tag used to drive the full Simply Swords rendering pipeline (ability header extraction,
     // LORE tab, STATS tab with stat bars). Defined on the provider; referenced here for
     // prepareAbilitySection. See SimplySwordsCompatTooltipProvider for full details.
@@ -625,10 +627,11 @@ public class TooltipRenderer {
                             panelX + padding(), cursorY, theme.sectionHeader(), true);
                     cursorY += lineHeight + sectionGap;
                 } else {
+                    int lineColor = isCooldownLine(line) ? COOLDOWN_TEXT_COLOR : theme.body();
                     context.drawText(tr,
                             Text.literal(line).setStyle(Style.EMPTY.withColor(
-                                    TextColor.fromRgb(theme.body() & 0x00FFFFFF))),
-                            panelX + padding(), cursorY, theme.body(), true);
+                                    TextColor.fromRgb(lineColor & 0x00FFFFFF))),
+                            panelX + padding(), cursorY, lineColor, true);
                     cursorY += lineHeight;
                     if (!line.trim().isEmpty()) {
                         sawAbilityContent = true;
@@ -1349,6 +1352,10 @@ public class TooltipRenderer {
         }
 
         return new AbilitySectionData(header, lines);
+    }
+
+    private static boolean isCooldownLine(String line) {
+        return line != null && line.stripLeading().startsWith(COOLDOWN_LINE_PREFIX);
     }
 
     private static boolean startsWithImplicitSection(List<String> lines) {
