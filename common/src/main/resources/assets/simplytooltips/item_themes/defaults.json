@@ -63,7 +63,7 @@
     "simplyswords:storms_edge":          { "theme": "lightning", "badges": ["UNIQUE", "TWINBLADE"]  },
     "simplyswords:stormbringer":         { "theme": "lightning", "badges": ["UNIQUE", "LONGSWORD"]  },
     "simplyswords:bramblethorn":         { "theme": "autumn",    "badges": ["UNIQUE", "RAPIER"]     },
-    "simplyswords:watching_warglaive":   { "theme": "echo",      "badges": ["UNIQUE", "TWINBLADE"]  },
+    "simplyswords:watching_warglaive":   { "theme": "echo",      "badges": ["UNIQUE", "WARGLAIVE"]  },
     "simplyswords:toxic_longsword":      { "theme": "poison",    "badges": ["UNIQUE", "LONGSWORD"]  },
     "simplyswords:emberblade":           { "theme": "ember",     "badges": ["UNIQUE", "LONGSWORD"]  },
     "simplyswords:frostfall":            { "theme": "ice",       "badges": ["UNIQUE", "HAMMER"]     },
