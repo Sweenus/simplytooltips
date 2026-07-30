@@ -194,7 +194,8 @@ public final class ApotheosisCompat {
                 model.animKeyExtra(),
                 model.themeKey(),
                 model.hint(),
-                newAffixLines.isEmpty() ? null : newAffixLines
+                newAffixLines.isEmpty() ? null : newAffixLines,
+                model.itemFrameProgress()
         );
     }
 

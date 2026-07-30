@@ -180,7 +180,11 @@ public class TooltipRenderer {
 
             // Data-driven badge override: item_themes JSON can replace the provider's default badges
             List<String> dataBadges = ItemThemeRegistry.resolveBadgesForStack(stack);
-            badges = dataBadges != null ? dataBadges : model.badges();
+            // Providers may use ALT to deliberately replace the normal data-driven badges
+            // with progress information (for example a weapon awakening level).
+            badges = altDown && model.itemFrameProgress() != null
+                    ? model.badges()
+                    : dataBadges != null ? dataBadges : model.badges();
 
             // Text wrapping & stat parsing
             AbilitySectionData builtSection = prepareAbilitySection(stack, model.abilityLines());
@@ -251,7 +255,10 @@ public class TooltipRenderer {
         int lineHeight  = tr.fontHeight + lineSpacing();
         int upgradeRowH = lineHeight + 3;
         int sectionGap  = 4;
-        int iconAreaW   = 36;
+        int frameLabelW = model.itemFrameProgress() == null
+                ? 0
+                : tr.getWidth(model.itemFrameProgress().levelLabel());
+        int iconAreaW   = Math.max(36, 30 + frameLabelW + 2);
         int hintRowH    = (model.hint() != null) ? lineHeight + 2 : 0;
         int headerBottomPad = Math.max(2, padding() - 8);
         int headerH     = padding() + 16 + 6 + 12 + hintRowH + headerBottomPad;
@@ -484,9 +491,11 @@ public class TooltipRenderer {
         // ---- Header: item icon ----
         int iconFrameX = panelX + padding() + 2;
         int iconFrameY = cursorY + 2;
+        long iconTimeMs = System.currentTimeMillis();
         TooltipPainter.drawItemFrame(context, iconFrameX, iconFrameY, 24, theme, itemBorderShape);
+        TooltipPainter.drawItemFrameProgress(context, iconFrameX, iconFrameY, 24,
+                itemBorderShape, model.itemFrameProgress(), tooltipElapsedMs);
 
-        long  iconTimeMs = System.currentTimeMillis();
         float breatheScale, spinDegrees, bobOffset;
         switch (itemAnimStyle != null ? itemAnimStyle : "breathe_spin_bob") {
             case "spin" -> {
@@ -529,6 +538,8 @@ public class TooltipRenderer {
         context.getMatrices().translate(-8.0F, -8.0F, 0.0F);
         context.drawItem(stack, 0, 0);
         context.getMatrices().pop();
+        TooltipPainter.drawItemFrameProgressLabel(context, tr, model.itemFrameProgress(),
+                iconFrameX + 26, iconFrameY - 2, tooltipElapsedMs);
 
         // ---- Header: title + badges ----
         int nameX = panelX + padding() + iconAreaW;
