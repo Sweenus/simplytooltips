@@ -14,6 +14,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.regex.Pattern;
 
 /**
  * Static utility methods for drawing common tooltip elements:
@@ -24,6 +25,7 @@ public class TooltipPainter {
     private static final long ITEM_FRAME_REVEAL_MS = 800L;
     private static final long ITEM_FRAME_SWEEP_MS = 1100L;
     private static final long ITEM_FRAME_SWEEP_GAP_MS = 250L;
+    private static final Pattern LEGACY_FORMATTING_CODE = Pattern.compile("(?i)\\u00A7[0-9A-FK-ORX]");
 
     // State for one-shot "hinge_fall" title animation (resets when tooltip animation resets).
     private static long   hingeLastElapsedMs = -1L;
@@ -1035,7 +1037,12 @@ public class TooltipPainter {
                 wrapped.add(" ");
                 continue;
             }
-            String[] words = raw.split("\\s+");
+            String normalized = LEGACY_FORMATTING_CODE.matcher(raw).replaceAll("");
+            if (normalized.isEmpty()) {
+                wrapped.add(" ");
+                continue;
+            }
+            String[] words = normalized.split("\\s+");
             StringBuilder current = new StringBuilder();
             for (String word : words) {
                 String candidate = current.isEmpty() ? word : current + " " + word;
