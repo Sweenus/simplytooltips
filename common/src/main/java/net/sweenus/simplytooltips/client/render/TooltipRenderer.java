@@ -108,8 +108,13 @@ public class TooltipRenderer {
         context.getMatrices().push();
         context.getMatrices().translate(0.0f, 0.0f, 400.0f);
 
+        TooltipExportRenderState.State exportState = TooltipExportRenderState.current();
+        boolean exportMode = exportState != null;
+
         boolean altDown = false;
-        try { altDown = Screen.hasAltDown(); } catch (Throwable ignored) {}
+        if (!exportMode) {
+            try { altDown = Screen.hasAltDown(); } catch (Throwable ignored) {}
+        }
 
         // ---- Build model and wrap text (with single-slot per-item cache) ----
         // Rebuilding the model, running Apotheosis augmentation, resolving the theme,
@@ -230,14 +235,16 @@ public class TooltipRenderer {
         }
 
         final TooltipTheme theme = resolvedDef.colors();
-        long tooltipElapsedMs = TooltipAnimator.updateAndGetElapsed(stack, model.animKeyExtra());
+        long tooltipElapsedMs = exportMode
+                ? exportState.elapsedMs
+                : TooltipAnimator.updateAndGetElapsed(stack, model.animKeyExtra());
 
         // ---- Tab and scroll state ----
         Identifier itemId = Registries.ITEM.getId(stack.getItem());
-        ScrollState.notifyItem(itemId);
+        if (!exportMode) ScrollState.notifyItem(itemId);
 
         List<TabState.Tab> availableTabs = new ArrayList<>();
-        if (TooltipNavigationConfig.tooltipTabs()) {
+        if (!exportMode && TooltipNavigationConfig.tooltipTabs()) {
             if (!wrappedAbility.isEmpty() || !wrappedCustom.isEmpty())        availableTabs.add(TabState.Tab.LORE);
             if (model.upgradeSection() != null)                               availableTabs.add(TabState.Tab.FORGE);
             if (!wrappedBody.isEmpty() || !wrappedExtra.isEmpty())            availableTabs.add(TabState.Tab.STATS);
@@ -245,11 +252,11 @@ public class TooltipRenderer {
             TabState.notifyItem(itemId, availableTabs);
         }
 
-        boolean tabsActive   = TooltipNavigationConfig.tooltipTabs() && TabState.multiTab();
-        boolean drawLore     = !tabsActive || TabState.activeTab() == TabState.Tab.LORE;
-        boolean drawForge    = !tabsActive || TabState.activeTab() == TabState.Tab.FORGE;
-        boolean drawStats    = !tabsActive || TabState.activeTab() == TabState.Tab.STATS;
-        boolean drawAffixes  = !tabsActive || TabState.activeTab() == TabState.Tab.AFFIXES;
+        boolean tabsActive   = !exportMode && TooltipNavigationConfig.tooltipTabs() && TabState.multiTab();
+        boolean drawLore     = exportMode || !tabsActive || TabState.activeTab() == TabState.Tab.LORE;
+        boolean drawForge    = !exportMode && (!tabsActive || TabState.activeTab() == TabState.Tab.FORGE);
+        boolean drawStats    = !exportMode && (!tabsActive || TabState.activeTab() == TabState.Tab.STATS);
+        boolean drawAffixes  = !exportMode && (!tabsActive || TabState.activeTab() == TabState.Tab.AFFIXES);
 
         // ---- Layout ----
         int lineHeight  = tr.fontHeight + lineSpacing();
@@ -458,18 +465,27 @@ public class TooltipRenderer {
         int panelH  = headerH + (hasBodyContent ? separatorH : 0) + bodyH + footerH;
 
         // Panel position (with screen-edge clamping)
-        int panelX = x + 12;
-        int panelY = y - 12;
-        if (panelX + panelW > screenW - 6) panelX = x - panelW - 12;
-        if (panelX < 6) panelX = 6;
-        if (panelY + panelH > screenH - 6) panelY = screenH - panelH - 6;
-        if (panelY < 6) panelY = 6;
+        int panelX;
+        int panelY;
+        if (exportMode) {
+            panelX = exportState.margin;
+            panelY = exportState.margin;
+        } else {
+            panelX = x + 12;
+            panelY = y - 12;
+            if (panelX + panelW > screenW - 6) panelX = x - panelW - 12;
+            if (panelX < 6) panelX = 6;
+            if (panelY + panelH > screenH - 6) panelY = screenH - panelH - 6;
+            if (panelY < 6) panelY = 6;
+        }
 
         // Scroll clamping — clamp body height to the smaller of screen-safe max and a fixed viewport cap
         final int MAX_BODY_H   = Math.min(
                 screenH - headerH - footerH - (hasBodyContent ? separatorH : 0) - 24,
                 maxBodyH());
-        final boolean scrollActive = TooltipNavigationConfig.scrollableTooltip() && bodyH > MAX_BODY_H;
+        final boolean scrollActive = !exportMode
+                && TooltipNavigationConfig.scrollableTooltip()
+                && bodyH > MAX_BODY_H;
         final int clampedBodyH = scrollActive ? MAX_BODY_H : bodyH;
         final int scrollMax    = scrollActive ? (bodyH - clampedBodyH) : 0;
         if (scrollActive) {
@@ -478,11 +494,20 @@ public class TooltipRenderer {
             if (panelY < 6) panelY = 6;
         }
 
+        if (exportMode) {
+            exportState.recordPanel(panelW, panelH);
+            if (exportState.measureOnly) {
+                context.getMatrices().pop();
+                return;
+            }
+        }
+
         // ---- Draw background and border ----
         TooltipPainter.drawGradientBackground(context, panelX, panelY, panelW, panelH, theme);
 
         BackgroundMotif motif = MotifRegistry.get(resolvedMotifKey);
-        if (motif != null) motif.draw(context, panelX, panelY, panelW, panelH, System.currentTimeMillis());
+        long renderTimeMs = exportMode ? exportState.absoluteTimeMs : System.currentTimeMillis();
+        if (motif != null) motif.draw(context, panelX, panelY, panelW, panelH, renderTimeMs);
 
         BorderRenderer.drawDecorativeBorder(context, panelX, panelY, panelW, panelH, theme, borderStyle);
 
@@ -491,7 +516,7 @@ public class TooltipRenderer {
         // ---- Header: item icon ----
         int iconFrameX = panelX + padding() + 2;
         int iconFrameY = cursorY + 2;
-        long iconTimeMs = System.currentTimeMillis();
+        long iconTimeMs = renderTimeMs;
         TooltipPainter.drawItemFrame(context, iconFrameX, iconFrameY, 24, theme, itemBorderShape);
         TooltipPainter.drawItemFrameProgress(context, iconFrameX, iconFrameY, 24,
                 itemBorderShape, model.itemFrameProgress(), tooltipElapsedMs);
@@ -571,9 +596,9 @@ public class TooltipRenderer {
             case "drop_bounce" -> TooltipPainter.drawDropBounceText(context, tr, displayTitle, nameX, nameY, theme.name(), tooltipElapsedMs);
             case "hinge_fall" -> {
                 // Clip title animation to tooltip bounds so off-panel motion stays hidden.
-                context.enableScissor(panelX + 1, panelY + 1, panelX + panelW - 1, panelY + panelH - 1);
+                if (!exportMode) context.enableScissor(panelX + 1, panelY + 1, panelX + panelW - 1, panelY + panelH - 1);
                 TooltipPainter.drawHingeFallText(context, tr, displayTitle, nameX, nameY, theme.name(), tooltipElapsedMs);
-                context.disableScissor();
+                if (!exportMode) context.disableScissor();
             }
             case "obfuscate" -> TooltipPainter.drawObfuscateText(context, tr, displayTitle, nameX, nameY, theme.name(), tooltipElapsedMs);
             case "static"  -> context.drawText(tr, Text.literal(displayTitle).setStyle(
@@ -952,8 +977,10 @@ public class TooltipRenderer {
         }
 
         // Record whether this frame had an active scroll region (used by MOUSE_SCROLLED to consume the event).
-        ScrollState.setScrollableActive(scrollActive);
-        TooltipGifRecorder.markTooltipRendered(panelX, panelY, panelW, panelH);
+        if (!exportMode) {
+            ScrollState.setScrollableActive(scrollActive);
+            TooltipGifRecorder.markTooltipRendered(panelX, panelY, panelW, panelH);
+        }
 
         context.getMatrices().pop();
     }

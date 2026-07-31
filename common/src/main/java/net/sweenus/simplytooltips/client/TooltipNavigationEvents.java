@@ -13,6 +13,7 @@ import net.minecraft.client.gui.screen.ingame.BookEditScreen;
 import net.minecraft.client.gui.widget.EditBoxWidget;
 import net.minecraft.client.gui.widget.TextFieldWidget;
 import net.sweenus.simplytooltips.client.render.TabState;
+import net.sweenus.simplytooltips.client.render.TooltipBatchExporter;
 import net.sweenus.simplytooltips.client.render.TooltipGifRecorder;
 import org.lwjgl.glfw.GLFW;
 
@@ -54,7 +55,10 @@ public class TooltipNavigationEvents {
             return EventResult.pass();
         });
 
-        ClientTickEvent.CLIENT_POST.register(client -> TooltipGifRecorder.tick());
+        ClientTickEvent.CLIENT_POST.register(client -> {
+            TooltipGifRecorder.tick();
+            TooltipBatchExporter.tick();
+        });
     }
 
     private static boolean isTextInputScreen(Screen screen) {
