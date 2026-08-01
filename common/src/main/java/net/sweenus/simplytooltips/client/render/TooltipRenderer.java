@@ -125,7 +125,7 @@ public class TooltipRenderer {
 
         final ModernTooltipModel model;
         final ThemeDefinition    resolvedDef;
-        final int                borderStyle;
+        final BorderDefinition   borderDef;
         final String             resolvedMotifKey;
         final String             itemAnimStyle;
         final String             titleAnimStyle;
@@ -149,7 +149,7 @@ public class TooltipRenderer {
             // Cache hit — reuse everything from the previous frame.
             model             = mbc.model;
             resolvedDef       = mbc.resolvedDef;
-            borderStyle       = mbc.borderStyle;
+            borderDef         = mbc.borderDef;
             resolvedMotifKey  = mbc.resolvedMotifKey;
             itemAnimStyle     = mbc.itemAnimStyle;
             titleAnimStyle    = mbc.titleAnimStyle;
@@ -177,7 +177,7 @@ public class TooltipRenderer {
             ThemeDefinition builtDef = resolveTheme(stack, model);
             resolvedDef  = builtDef;
             final String motifStr = resolvedDef.motif();
-            borderStyle      = borderStyleFor(motifStr);
+            borderDef        = BorderDefinitionRegistry.resolve(resolveBorderKey(stack, resolvedDef));
             resolvedMotifKey = "none".equals(motifStr) ? null : motifStr;
             itemAnimStyle    = resolvedDef.itemAnimStyle();
             titleAnimStyle   = resolvedDef.titleAnimStyle();
@@ -226,7 +226,7 @@ public class TooltipRenderer {
 
             modelBuildCache = new ModelBuildCache(
                     stack, altDown, currMaxW,
-                    model, resolvedDef, borderStyle, resolvedMotifKey,
+                    model, resolvedDef, borderDef, resolvedMotifKey,
                     itemAnimStyle, titleAnimStyle, itemBorderShape,
                     badges, abilitySection,
                     wrappedAbility, wrappedCustom, wrappedBody,
@@ -509,7 +509,7 @@ public class TooltipRenderer {
         long renderTimeMs = exportMode ? exportState.absoluteTimeMs : System.currentTimeMillis();
         if (motif != null) motif.draw(context, panelX, panelY, panelW, panelH, renderTimeMs);
 
-        BorderRenderer.drawDecorativeBorder(context, panelX, panelY, panelW, panelH, theme, borderStyle);
+        BorderRenderer.drawDecorativeBorder(context, panelX, panelY, panelW, panelH, theme, borderDef);
 
         int cursorY = panelY + padding();
 
@@ -987,69 +987,17 @@ public class TooltipRenderer {
 
     // --- Helpers ---
 
-    /** Maps a border-style constant to the motif key used by {@link MotifRegistry}. */
-    private static String motifKeyFor(int borderStyle) {
-        return switch (borderStyle) {
-            case TooltipBorderStyle.VINE      -> "vine";
-            case TooltipBorderStyle.BEE       -> "bee";
-            case TooltipBorderStyle.BLOSSOM   -> "blossom";
-            case TooltipBorderStyle.BUBBLE    -> "bubble";
-            case TooltipBorderStyle.EARTH     -> "earth";
-            case TooltipBorderStyle.ECHO      -> "echo";
-            case TooltipBorderStyle.ICE       -> "ice";
-            case TooltipBorderStyle.LIGHTNING -> "lightning";
-            case TooltipBorderStyle.EMBER     -> "ember";
-            case TooltipBorderStyle.ENCHANTED -> "enchanted";
-            case TooltipBorderStyle.AUTUMN    -> "autumn";
-            case TooltipBorderStyle.SOUL      -> "soul";
-            case TooltipBorderStyle.DEEP_DARK -> "deepdark";
-            case TooltipBorderStyle.POISON    -> "poison";
-            case TooltipBorderStyle.OCEAN     -> "ocean";
-            case TooltipBorderStyle.RUSTIC    -> "rustic";
-            case TooltipBorderStyle.HONEY     -> "honey";
-            case TooltipBorderStyle.JADE      -> "jade";
-            case TooltipBorderStyle.WOOD      -> "wood";
-            case TooltipBorderStyle.STONE     -> "stone";
-            case TooltipBorderStyle.IRON      -> "iron";
-            case TooltipBorderStyle.GOLD      -> "gold";
-            case TooltipBorderStyle.DIAMOND   -> "diamond";
-            case TooltipBorderStyle.NETHERITE -> "netherite";
-            case TooltipBorderStyle.RUNIC     -> "runic";
-            default -> null;
-        };
-    }
-
-    /** Maps a motif name string (from {@link ThemeDefinition}) to a border-style constant. */
-    private static int borderStyleFor(String motif) {
-        if (motif == null) return TooltipBorderStyle.DEFAULT;
-        return switch (motif) {
-            case "vine"      -> TooltipBorderStyle.VINE;
-            case "bee"       -> TooltipBorderStyle.BEE;
-            case "blossom"   -> TooltipBorderStyle.BLOSSOM;
-            case "bubble"    -> TooltipBorderStyle.BUBBLE;
-            case "earth"     -> TooltipBorderStyle.EARTH;
-            case "echo"      -> TooltipBorderStyle.ECHO;
-            case "ice"       -> TooltipBorderStyle.ICE;
-            case "lightning" -> TooltipBorderStyle.LIGHTNING;
-            case "ember"     -> TooltipBorderStyle.EMBER;
-            case "enchanted" -> TooltipBorderStyle.ENCHANTED;
-            case "autumn"    -> TooltipBorderStyle.AUTUMN;
-            case "soul"      -> TooltipBorderStyle.SOUL;
-            case "deepdark"  -> TooltipBorderStyle.DEEP_DARK;
-            case "poison"    -> TooltipBorderStyle.POISON;
-            case "ocean"     -> TooltipBorderStyle.OCEAN;
-            case "rustic"    -> TooltipBorderStyle.RUSTIC;
-            case "honey"     -> TooltipBorderStyle.HONEY;
-            case "jade"      -> TooltipBorderStyle.JADE;
-            case "wood"      -> TooltipBorderStyle.WOOD;
-            case "stone"     -> TooltipBorderStyle.STONE;
-            case "iron"      -> TooltipBorderStyle.IRON;
-            case "gold"      -> TooltipBorderStyle.GOLD;
-            case "diamond"   -> TooltipBorderStyle.DIAMOND;
-            case "netherite" -> TooltipBorderStyle.NETHERITE;
-            case "runic"     -> TooltipBorderStyle.RUNIC;
-            default          -> TooltipBorderStyle.DEFAULT;
-        };
+    /**
+     * Resolves which border this stack draws, as a key for {@link BorderDefinitionRegistry}.
+     *
+     * <p>Priority: an explicit {@code border} entry in {@code item_themes} (component → item → tag)
+     * wins, because that is a deliberate authored override — this is what lets a rarity restyle only
+     * the frame while the item keeps its own theme. Otherwise the resolved theme's own {@code border}
+     * applies, which for themes written before borders existed is their {@code motif}.
+     */
+    private static String resolveBorderKey(ItemStack stack, ThemeDefinition themeDef) {
+        String dataKey = ItemThemeRegistry.resolveBorderForStack(stack);
+        return dataKey != null ? dataKey : themeDef.border();
     }
 
     /**
@@ -1723,7 +1671,7 @@ public class TooltipRenderer {
         // --- Cached results ---
         final ModernTooltipModel model;
         final ThemeDefinition    resolvedDef;
-        final int                borderStyle;
+        final BorderDefinition   borderDef;
         final String             resolvedMotifKey;
         final String             itemAnimStyle;
         final String             titleAnimStyle;
@@ -1743,7 +1691,7 @@ public class TooltipRenderer {
 
         ModelBuildCache(ItemStack stack, boolean altDown, int maxW,
                         ModernTooltipModel model, ThemeDefinition resolvedDef,
-                        int borderStyle, String resolvedMotifKey,
+                        BorderDefinition borderDef, String resolvedMotifKey,
                         String itemAnimStyle, String titleAnimStyle, String itemBorderShape,
                         List<String> badges, AbilitySectionData abilitySection,
                         List<String> wrappedAbility, List<String> wrappedCustom,
@@ -1756,7 +1704,7 @@ public class TooltipRenderer {
             this.maxW             = maxW;
             this.model            = model;
             this.resolvedDef      = resolvedDef;
-            this.borderStyle      = borderStyle;
+            this.borderDef        = borderDef;
             this.resolvedMotifKey = resolvedMotifKey;
             this.itemAnimStyle    = itemAnimStyle;
             this.titleAnimStyle   = titleAnimStyle;

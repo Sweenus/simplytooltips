@@ -9,6 +9,7 @@ import java.util.List;
  * <p>Defaults (used when a JSON field is absent):
  * <ul>
  *   <li>{@code motif} = {@code "none"} (no background particles)
+ *   <li>{@code borderStyle} = whatever {@code motif} is set to
  *   <li>{@code itemAnimStyle} = {@code "breathe_spin_bob"}
  *   <li>{@code titleAnimStyle} = {@code "wave"}
  *   <li>{@code itemBorderShape} = {@code "diamond"}
@@ -21,6 +22,18 @@ public record ThemeDefinition(
 
         /** Key into {@code MotifRegistry}, e.g. {@code "vine"} or {@code "none"} for no motif. */
         String motif,
+
+        /**
+         * Which border to draw around the panel: a {@code borders/<key>.json} definition, or a bare
+         * pattern key from {@code BorderRegistry} (the built-ins share their keys with the motifs).
+         * {@code "none"} or an unknown key leaves the plain themed outline undecorated.
+         *
+         * <p>Read from the theme file's {@code borderStyle} field — {@code border} is taken, it is
+         * the frame colour in {@link TooltipTheme}. When the field is absent this falls back to
+         * {@code motif}, which is how borders were selected before they became their own concept,
+         * so themes written against the old behaviour keep the border they have always had.
+         */
+        String border,
 
         /**
          * Animation style for the item icon in the header.
@@ -74,6 +87,7 @@ public record ThemeDefinition(
     public static ThemeDefinition defaultDefinition() {
         return new ThemeDefinition(
                 TooltipTheme.defaultTheme(),
+                "none",
                 "none",
                 "breathe_spin_bob",
                 "wave",

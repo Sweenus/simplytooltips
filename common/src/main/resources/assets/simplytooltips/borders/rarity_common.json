@@ -1,0 +1,8 @@
+{
+  "pattern": "stone",
+  "frame": "0xFFCCCCCC",
+  "frameInner": "0xFF888888",
+  "accentA": "0xFFB0B0B0",
+  "accentB": "0xFF7A7A7A",
+  "accentC": "0xFFDDDDDD"
+}

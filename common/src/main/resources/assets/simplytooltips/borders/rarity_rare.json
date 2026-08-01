@@ -1,0 +1,8 @@
+{
+  "pattern": "diamond",
+  "frame": "0xFF55FFFF",
+  "frameInner": "0xFF00AAAA",
+  "accentA": "0xFF55FFFF",
+  "accentB": "0xFF00AAAA",
+  "accentC": "0xFFCFFFFF"
+}

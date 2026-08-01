@@ -69,6 +69,10 @@ public class ThemeRegistry {
 
                 TooltipTheme colors = TooltipTheme.fromJson(json);
                 String motif           = str(json, "motif",           "none");
+                // NB: "border" is already this file's frame *colour*, so the pattern selector is
+                // "borderStyle". It defaults to the motif key because before borders were their own
+                // concept the motif selected both. Themes without the field keep the border they had.
+                String border          = str(json, "borderStyle",     motif);
                 String itemAnimStyle   = str(json, "itemAnimStyle",   "breathe_spin_bob");
                 String titleAnimStyle  = str(json, "titleAnimStyle",  "wave");
                 String itemBorderShape = str(json, "itemBorderShape", "diamond");
@@ -79,7 +83,7 @@ public class ThemeRegistry {
                     for (JsonElement el : arr) customTextKeys.add(el.getAsString());
                 }
 
-                THEMES.put(key, new ThemeDefinition(colors, motif, itemAnimStyle,
+                THEMES.put(key, new ThemeDefinition(colors, motif, border, itemAnimStyle,
                         titleAnimStyle, itemBorderShape, customTextKeys));
             } catch (Exception e) {
                 SimplyTooltips.LOGGER.error("[SimplyTooltips] Failed to load theme '{}': {}", key, e.getMessage());

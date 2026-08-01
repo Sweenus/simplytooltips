@@ -123,11 +123,11 @@
     "simplybows:upgrades/enchanted_bow_string":             { "theme": "autumn",    "badges": ["UPGRADE"] }
   },
   "components": [
-    { "component": "apotheosis:rarity=apotheosis:common",   "theme": "rarity_common",   "badges": ["COMMON"]   },
-    { "component": "apotheosis:rarity=apotheosis:uncommon", "theme": "rarity_uncommon", "badges": ["UNCOMMON"] },
-    { "component": "apotheosis:rarity=apotheosis:rare",     "theme": "rarity_rare",     "badges": ["RARE"]     },
-    { "component": "apotheosis:rarity=apotheosis:epic",     "theme": "rarity_epic",     "badges": ["EPIC"]     },
-    { "component": "apotheosis:rarity=apotheosis:mythic",   "theme": "rarity_mythic",   "badges": ["MYTHIC"]   }
+    { "component": "apotheosis:rarity=apotheosis:common",   "border": "rarity_common",   "badges": ["COMMON"]   },
+    { "component": "apotheosis:rarity=apotheosis:uncommon", "border": "rarity_uncommon", "badges": ["UNCOMMON"] },
+    { "component": "apotheosis:rarity=apotheosis:rare",     "border": "rarity_rare",     "badges": ["RARE"]     },
+    { "component": "apotheosis:rarity=apotheosis:epic",     "border": "rarity_epic",     "badges": ["EPIC"]     },
+    { "component": "apotheosis:rarity=apotheosis:mythic",   "border": "rarity_mythic",   "badges": ["MYTHIC"]   }
   ],
   "tags": [
     { "tag": "minecraft:swords",    "badges": ["SWORD"]   },
