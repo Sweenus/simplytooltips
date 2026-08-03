@@ -63,7 +63,7 @@
     "simplyswords:storms_edge":          { "theme": "lightning", "badges": ["UNIQUE", "TWINBLADE"]  },
     "simplyswords:stormbringer":         { "theme": "lightning", "badges": ["UNIQUE", "LONGSWORD"]  },
     "simplyswords:bramblethorn":         { "theme": "autumn",    "badges": ["UNIQUE", "RAPIER"]     },
-    "simplyswords:watching_warglaive":   { "theme": "echo",      "badges": ["UNIQUE", "TWINBLADE"]  },
+    "simplyswords:watching_warglaive":   { "theme": "echo",      "badges": ["UNIQUE", "WARGLAIVE"]  },
     "simplyswords:toxic_longsword":      { "theme": "poison",    "badges": ["UNIQUE", "LONGSWORD"]  },
     "simplyswords:emberblade":           { "theme": "ember",     "badges": ["UNIQUE", "LONGSWORD"]  },
     "simplyswords:frostfall":            { "theme": "ice",       "badges": ["UNIQUE", "HAMMER"]     },
@@ -104,7 +104,7 @@
     "simplyswords:magispear":            { "theme": "deepdark",  "badges": ["UNIQUE", "SPEAR"]      },
     "simplyswords:enigma":               { "theme": "jade",      "badges": ["UNIQUE", "CLAYMORE"]   },
     "simplyswords:caelestis":            { "theme": "enchanted", "badges": ["UNIQUE", "CLAYMORE"]   },
-    "simplyswords:wraithfang":           { "theme": "echo",      "badges": ["UNIQUE", "DAGGER"]     },
+    "simplyswords:wraithfang":           { "theme": "echo",      "badges": ["UNIQUE", "CUTLASS"]    },
     "simplyswords:chompolotl":           { "theme": "bubble",    "badges": ["UNIQUE", "CHAKRAM"]    },
     "simplyswords:dreadtide":            { "theme": "bubble",    "badges": ["UNIQUE", "TWINBLADE"]  },
 
@@ -114,6 +114,7 @@
     "simplyswords:netherfused_gem":       { "theme": "ember",          "badges": ["UPGRADE"] },
     "simplyswords:runefused_gem":         { "theme": "runic",          "badges": ["UPGRADE"] },
     "simplyswords:runic_tablet":          { "theme": "runic",          "badges": ["UPGRADE"] },
+    "simplyswords:runic_forge":           { "theme": "runic",          "badges": ["WORKBENCH"] },
 
     "simplybows:upgrades/rune_etching_grace":               { "theme": "autumn",    "badges": ["UPGRADE"] },
     "simplybows:upgrades/rune_etching_pain":                { "theme": "autumn",    "badges": ["UPGRADE"] },
@@ -122,13 +123,20 @@
     "simplybows:upgrades/reinforced_bow_frame":             { "theme": "autumn",    "badges": ["UPGRADE"] },
     "simplybows:upgrades/enchanted_bow_string":             { "theme": "autumn",    "badges": ["UPGRADE"] }
   },
+  "components": [
+    { "component": "apotheosis:rarity=apotheosis:common",   "border": "rarity_common",   "badges": ["COMMON"]   },
+    { "component": "apotheosis:rarity=apotheosis:uncommon", "border": "rarity_uncommon", "badges": ["UNCOMMON"] },
+    { "component": "apotheosis:rarity=apotheosis:rare",     "border": "rarity_rare",     "badges": ["RARE"]     },
+    { "component": "apotheosis:rarity=apotheosis:epic",     "border": "rarity_epic",     "badges": ["EPIC"]     },
+    { "component": "apotheosis:rarity=apotheosis:mythic",   "border": "rarity_mythic",   "badges": ["MYTHIC"]   }
+  ],
   "tags": [
     { "tag": "minecraft:swords",    "badges": ["SWORD"]   },
     { "tag": "minecraft:axes",      "badges": ["AXE"]     },
     { "tag": "minecraft:pickaxes",  "badges": ["PICKAXE"] },
     { "tag": "minecraft:shovels",   "badges": ["SHOVEL"]  },
     { "tag": "minecraft:arrows",    "badges": ["ARROW"]   },
-    { "tag": "minecraft:hoes",      "theme": "vine",      "badges": ["HOE"]     },
+    { "tag": "minecraft:hoes",      "badges": ["HOE"]     },
     { "tag": "minecraft:tridents",  "theme": "bubble",    "badges": ["TRIDENT"] },
 
     { "tag": "c:arrows",              "badges": ["ARROW"]   },

@@ -1,6 +1,7 @@
 package net.sweenus.simplytooltips.api;
 
 import com.google.gson.JsonObject;
+import org.jetbrains.annotations.Nullable;
 
 public record TooltipTheme(
         int border,
@@ -64,11 +65,21 @@ public record TooltipTheme(
     }
 
     private static int color(JsonObject json, String key, int fallback) {
-        if (!json.has(key)) return fallback;
+        Integer parsed = colorOrNull(json, key);
+        return parsed != null ? parsed : fallback;
+    }
+
+    /**
+     * Parses a {@code "0xAARRGGBB"} hex-string colour field, or returns {@code null} when the key is
+     * absent or unparsable. Shared with {@link BorderPalette#fromJson(JsonObject)} so border and theme
+     * files accept exactly the same colour syntax.
+     */
+    public static @Nullable Integer colorOrNull(JsonObject json, String key) {
+        if (!json.has(key)) return null;
         try {
             return (int) Long.parseLong(json.get(key).getAsString().replace("0x", ""), 16);
         } catch (NumberFormatException e) {
-            return fallback;
+            return null;
         }
     }
 }

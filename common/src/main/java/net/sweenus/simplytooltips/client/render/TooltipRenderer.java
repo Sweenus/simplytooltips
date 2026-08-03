@@ -45,6 +45,8 @@ public class TooltipRenderer {
             "(?i)^.*?unique\\s+effect\\s*:\\s*(.+?)\\s*$"
     );
     private static final String DEFAULT_ABILITY_HEADER = "Description";
+    private static final String COOLDOWN_LINE_PREFIX = "\u231B";
+    private static final int COOLDOWN_TEXT_COLOR = 0xF6A23A;
     // Tag used to drive the full Simply Swords rendering pipeline (ability header extraction,
     // LORE tab, STATS tab with stat bars). Defined on the provider; referenced here for
     // prepareAbilitySection. See SimplySwordsCompatTooltipProvider for full details.
@@ -107,8 +109,13 @@ public class TooltipRenderer {
         context.getMatrices().push();
         context.getMatrices().translate(0.0f, 0.0f, 400.0f);
 
+        TooltipExportRenderState.State exportState = TooltipExportRenderState.current();
+        boolean exportMode = exportState != null;
+
         boolean altDown = false;
-        try { altDown = Screen.hasAltDown(); } catch (Throwable ignored) {}
+        if (!exportMode) {
+            try { altDown = Screen.hasAltDown(); } catch (Throwable ignored) {}
+        }
 
         // ---- Build model and wrap text (with single-slot per-item cache) ----
         // Rebuilding the model, running Apotheosis augmentation, resolving the theme,
@@ -119,7 +126,7 @@ public class TooltipRenderer {
 
         final ModernTooltipModel model;
         final ThemeDefinition    resolvedDef;
-        final int                borderStyle;
+        final BorderDefinition   borderDef;
         final String             resolvedMotifKey;
         final String             itemAnimStyle;
         final String             titleAnimStyle;
@@ -143,7 +150,7 @@ public class TooltipRenderer {
             // Cache hit — reuse everything from the previous frame.
             model             = mbc.model;
             resolvedDef       = mbc.resolvedDef;
-            borderStyle       = mbc.borderStyle;
+            borderDef         = mbc.borderDef;
             resolvedMotifKey  = mbc.resolvedMotifKey;
             itemAnimStyle     = mbc.itemAnimStyle;
             titleAnimStyle    = mbc.titleAnimStyle;
@@ -167,11 +174,11 @@ public class TooltipRenderer {
             builtModel  = ApotheosisCompat.augment(builtModel, rawLines, stack, altDown);
             model       = builtModel;
 
-            // Resolve theme via priority chain: provider key > item/tag data > rarity
+            // Resolve theme via priority chain: component > item > provider > tag > rarity
             ThemeDefinition builtDef = resolveTheme(stack, model);
             resolvedDef  = builtDef;
             final String motifStr = resolvedDef.motif();
-            borderStyle      = borderStyleFor(motifStr);
+            borderDef        = BorderDefinitionRegistry.resolve(resolveBorderKey(stack, resolvedDef));
             resolvedMotifKey = "none".equals(motifStr) ? null : motifStr;
             itemAnimStyle    = resolvedDef.itemAnimStyle();
             titleAnimStyle   = resolvedDef.titleAnimStyle();
@@ -179,7 +186,11 @@ public class TooltipRenderer {
 
             // Data-driven badge override: item_themes JSON can replace the provider's default badges
             List<String> dataBadges = ItemThemeRegistry.resolveBadgesForStack(stack);
-            badges = dataBadges != null ? dataBadges : model.badges();
+            // Providers may use ALT to deliberately replace the normal data-driven badges
+            // with progress information (for example a weapon awakening level).
+            badges = altDown && model.itemFrameProgress() != null
+                    ? model.badges()
+                    : dataBadges != null ? dataBadges : model.badges();
 
             // Text wrapping & stat parsing
             AbilitySectionData builtSection = prepareAbilitySection(stack, model.abilityLines());
@@ -216,7 +227,7 @@ public class TooltipRenderer {
 
             modelBuildCache = new ModelBuildCache(
                     stack, altDown, currMaxW,
-                    model, resolvedDef, borderStyle, resolvedMotifKey,
+                    model, resolvedDef, borderDef, resolvedMotifKey,
                     itemAnimStyle, titleAnimStyle, itemBorderShape,
                     badges, abilitySection,
                     wrappedAbility, wrappedCustom, wrappedBody,
@@ -225,14 +236,16 @@ public class TooltipRenderer {
         }
 
         final TooltipTheme theme = resolvedDef.colors();
-        long tooltipElapsedMs = TooltipAnimator.updateAndGetElapsed(stack, model.animKeyExtra());
+        long tooltipElapsedMs = exportMode
+                ? exportState.elapsedMs
+                : TooltipAnimator.updateAndGetElapsed(stack, model.animKeyExtra());
 
         // ---- Tab and scroll state ----
         Identifier itemId = Registries.ITEM.getId(stack.getItem());
-        ScrollState.notifyItem(itemId);
+        if (!exportMode) ScrollState.notifyItem(itemId);
 
         List<TabState.Tab> availableTabs = new ArrayList<>();
-        if (TooltipNavigationConfig.tooltipTabs()) {
+        if (!exportMode && TooltipNavigationConfig.tooltipTabs()) {
             if (!wrappedAbility.isEmpty() || !wrappedCustom.isEmpty())        availableTabs.add(TabState.Tab.LORE);
             if (model.upgradeSection() != null)                               availableTabs.add(TabState.Tab.FORGE);
             if (!wrappedBody.isEmpty() || !wrappedExtra.isEmpty())            availableTabs.add(TabState.Tab.STATS);
@@ -240,17 +253,20 @@ public class TooltipRenderer {
             TabState.notifyItem(itemId, availableTabs);
         }
 
-        boolean tabsActive   = TooltipNavigationConfig.tooltipTabs() && TabState.multiTab();
-        boolean drawLore     = !tabsActive || TabState.activeTab() == TabState.Tab.LORE;
-        boolean drawForge    = !tabsActive || TabState.activeTab() == TabState.Tab.FORGE;
-        boolean drawStats    = !tabsActive || TabState.activeTab() == TabState.Tab.STATS;
-        boolean drawAffixes  = !tabsActive || TabState.activeTab() == TabState.Tab.AFFIXES;
+        boolean tabsActive   = !exportMode && TooltipNavigationConfig.tooltipTabs() && TabState.multiTab();
+        boolean drawLore     = exportMode || !tabsActive || TabState.activeTab() == TabState.Tab.LORE;
+        boolean drawForge    = !exportMode && (!tabsActive || TabState.activeTab() == TabState.Tab.FORGE);
+        boolean drawStats    = !exportMode && (!tabsActive || TabState.activeTab() == TabState.Tab.STATS);
+        boolean drawAffixes  = !exportMode && (!tabsActive || TabState.activeTab() == TabState.Tab.AFFIXES);
 
         // ---- Layout ----
         int lineHeight  = tr.fontHeight + lineSpacing();
         int upgradeRowH = lineHeight + 3;
         int sectionGap  = 4;
-        int iconAreaW   = 36;
+        int frameLabelW = model.itemFrameProgress() == null
+                ? 0
+                : tr.getWidth(model.itemFrameProgress().levelLabel());
+        int iconAreaW   = Math.max(36, 30 + frameLabelW + 2);
         int hintRowH    = (model.hint() != null) ? lineHeight + 2 : 0;
         int headerBottomPad = Math.max(2, padding() - 8);
         int headerH     = padding() + 16 + 6 + 12 + hintRowH + headerBottomPad;
@@ -450,18 +466,27 @@ public class TooltipRenderer {
         int panelH  = headerH + (hasBodyContent ? separatorH : 0) + bodyH + footerH;
 
         // Panel position (with screen-edge clamping)
-        int panelX = x + 12;
-        int panelY = y - 12;
-        if (panelX + panelW > screenW - 6) panelX = x - panelW - 12;
-        if (panelX < 6) panelX = 6;
-        if (panelY + panelH > screenH - 6) panelY = screenH - panelH - 6;
-        if (panelY < 6) panelY = 6;
+        int panelX;
+        int panelY;
+        if (exportMode) {
+            panelX = exportState.margin;
+            panelY = exportState.margin;
+        } else {
+            panelX = x + 12;
+            panelY = y - 12;
+            if (panelX + panelW > screenW - 6) panelX = x - panelW - 12;
+            if (panelX < 6) panelX = 6;
+            if (panelY + panelH > screenH - 6) panelY = screenH - panelH - 6;
+            if (panelY < 6) panelY = 6;
+        }
 
         // Scroll clamping — clamp body height to the smaller of screen-safe max and a fixed viewport cap
         final int MAX_BODY_H   = Math.min(
                 screenH - headerH - footerH - (hasBodyContent ? separatorH : 0) - 24,
                 maxBodyH());
-        final boolean scrollActive = TooltipNavigationConfig.scrollableTooltip() && bodyH > MAX_BODY_H;
+        final boolean scrollActive = !exportMode
+                && TooltipNavigationConfig.scrollableTooltip()
+                && bodyH > MAX_BODY_H;
         final int clampedBodyH = scrollActive ? MAX_BODY_H : bodyH;
         final int scrollMax    = scrollActive ? (bodyH - clampedBodyH) : 0;
         if (scrollActive) {
@@ -470,22 +495,33 @@ public class TooltipRenderer {
             if (panelY < 6) panelY = 6;
         }
 
+        if (exportMode) {
+            exportState.recordPanel(panelW, panelH);
+            if (exportState.measureOnly) {
+                context.getMatrices().pop();
+                return;
+            }
+        }
+
         // ---- Draw background and border ----
         TooltipPainter.drawGradientBackground(context, panelX, panelY, panelW, panelH, theme);
 
         BackgroundMotif motif = MotifRegistry.get(resolvedMotifKey);
-        if (motif != null) motif.draw(context, panelX, panelY, panelW, panelH, System.currentTimeMillis());
+        long renderTimeMs = exportMode ? exportState.absoluteTimeMs : System.currentTimeMillis();
+        if (motif != null) motif.draw(context, panelX, panelY, panelW, panelH, renderTimeMs);
 
-        BorderRenderer.drawDecorativeBorder(context, panelX, panelY, panelW, panelH, theme, borderStyle);
+        BorderRenderer.drawDecorativeBorder(context, panelX, panelY, panelW, panelH, theme, borderDef);
 
         int cursorY = panelY + padding();
 
         // ---- Header: item icon ----
         int iconFrameX = panelX + padding() + 2;
         int iconFrameY = cursorY + 2;
+        long iconTimeMs = renderTimeMs;
         TooltipPainter.drawItemFrame(context, iconFrameX, iconFrameY, 24, theme, itemBorderShape);
+        TooltipPainter.drawItemFrameProgress(context, iconFrameX, iconFrameY, 24,
+                itemBorderShape, model.itemFrameProgress(), tooltipElapsedMs);
 
-        long  iconTimeMs = System.currentTimeMillis();
         float breatheScale, spinDegrees, bobOffset;
         switch (itemAnimStyle != null ? itemAnimStyle : "breathe_spin_bob") {
             case "spin" -> {
@@ -528,6 +564,8 @@ public class TooltipRenderer {
         context.getMatrices().translate(-8.0F, -8.0F, 0.0F);
         context.drawItem(stack, 0, 0);
         context.getMatrices().pop();
+        TooltipPainter.drawItemFrameProgressLabel(context, tr, model.itemFrameProgress(),
+                iconFrameX + 26, iconFrameY - 2, tooltipElapsedMs);
 
         // ---- Header: title + badges ----
         int nameX = panelX + padding() + iconAreaW;
@@ -559,9 +597,9 @@ public class TooltipRenderer {
             case "drop_bounce" -> TooltipPainter.drawDropBounceText(context, tr, displayTitle, nameX, nameY, theme.name(), tooltipElapsedMs);
             case "hinge_fall" -> {
                 // Clip title animation to tooltip bounds so off-panel motion stays hidden.
-                context.enableScissor(panelX + 1, panelY + 1, panelX + panelW - 1, panelY + panelH - 1);
+                if (!exportMode) context.enableScissor(panelX + 1, panelY + 1, panelX + panelW - 1, panelY + panelH - 1);
                 TooltipPainter.drawHingeFallText(context, tr, displayTitle, nameX, nameY, theme.name(), tooltipElapsedMs);
-                context.disableScissor();
+                if (!exportMode) context.disableScissor();
             }
             case "obfuscate" -> TooltipPainter.drawObfuscateText(context, tr, displayTitle, nameX, nameY, theme.name(), tooltipElapsedMs);
             case "static"  -> context.drawText(tr, Text.literal(displayTitle).setStyle(
@@ -626,10 +664,11 @@ public class TooltipRenderer {
                             panelX + padding(), cursorY, theme.sectionHeader(), true);
                     cursorY += lineHeight + sectionGap;
                 } else {
+                    int lineColor = isCooldownLine(line) ? COOLDOWN_TEXT_COLOR : theme.body();
                     context.drawText(tr,
                             Text.literal(line).setStyle(Style.EMPTY.withColor(
-                                    TextColor.fromRgb(theme.body() & 0x00FFFFFF))),
-                            panelX + padding(), cursorY, theme.body(), true);
+                                    TextColor.fromRgb(lineColor & 0x00FFFFFF))),
+                            panelX + padding(), cursorY, lineColor, true);
                     cursorY += lineHeight;
                     if (!line.trim().isEmpty()) {
                         sawAbilityContent = true;
@@ -939,83 +978,34 @@ public class TooltipRenderer {
         }
 
         // Record whether this frame had an active scroll region (used by MOUSE_SCROLLED to consume the event).
-        ScrollState.setScrollableActive(scrollActive);
-        TooltipGifRecorder.markTooltipRendered(panelX, panelY, panelW, panelH);
+        if (!exportMode) {
+            ScrollState.setScrollableActive(scrollActive);
+            TooltipGifRecorder.markTooltipRendered(panelX, panelY, panelW, panelH);
+        }
 
         context.getMatrices().pop();
     }
 
     // --- Helpers ---
 
-    /** Maps a border-style constant to the motif key used by {@link MotifRegistry}. */
-    private static String motifKeyFor(int borderStyle) {
-        return switch (borderStyle) {
-            case TooltipBorderStyle.VINE      -> "vine";
-            case TooltipBorderStyle.BEE       -> "bee";
-            case TooltipBorderStyle.BLOSSOM   -> "blossom";
-            case TooltipBorderStyle.BUBBLE    -> "bubble";
-            case TooltipBorderStyle.EARTH     -> "earth";
-            case TooltipBorderStyle.ECHO      -> "echo";
-            case TooltipBorderStyle.ICE       -> "ice";
-            case TooltipBorderStyle.LIGHTNING -> "lightning";
-            case TooltipBorderStyle.EMBER     -> "ember";
-            case TooltipBorderStyle.ENCHANTED -> "enchanted";
-            case TooltipBorderStyle.AUTUMN    -> "autumn";
-            case TooltipBorderStyle.SOUL      -> "soul";
-            case TooltipBorderStyle.DEEP_DARK -> "deepdark";
-            case TooltipBorderStyle.POISON    -> "poison";
-            case TooltipBorderStyle.OCEAN     -> "ocean";
-            case TooltipBorderStyle.RUSTIC    -> "rustic";
-            case TooltipBorderStyle.HONEY     -> "honey";
-            case TooltipBorderStyle.JADE      -> "jade";
-            case TooltipBorderStyle.WOOD      -> "wood";
-            case TooltipBorderStyle.STONE     -> "stone";
-            case TooltipBorderStyle.IRON      -> "iron";
-            case TooltipBorderStyle.GOLD      -> "gold";
-            case TooltipBorderStyle.DIAMOND   -> "diamond";
-            case TooltipBorderStyle.NETHERITE -> "netherite";
-            case TooltipBorderStyle.RUNIC     -> "runic";
-            default -> null;
-        };
-    }
-
-    /** Maps a motif name string (from {@link ThemeDefinition}) to a border-style constant. */
-    private static int borderStyleFor(String motif) {
-        if (motif == null) return TooltipBorderStyle.DEFAULT;
-        return switch (motif) {
-            case "vine"      -> TooltipBorderStyle.VINE;
-            case "bee"       -> TooltipBorderStyle.BEE;
-            case "blossom"   -> TooltipBorderStyle.BLOSSOM;
-            case "bubble"    -> TooltipBorderStyle.BUBBLE;
-            case "earth"     -> TooltipBorderStyle.EARTH;
-            case "echo"      -> TooltipBorderStyle.ECHO;
-            case "ice"       -> TooltipBorderStyle.ICE;
-            case "lightning" -> TooltipBorderStyle.LIGHTNING;
-            case "ember"     -> TooltipBorderStyle.EMBER;
-            case "enchanted" -> TooltipBorderStyle.ENCHANTED;
-            case "autumn"    -> TooltipBorderStyle.AUTUMN;
-            case "soul"      -> TooltipBorderStyle.SOUL;
-            case "deepdark"  -> TooltipBorderStyle.DEEP_DARK;
-            case "poison"    -> TooltipBorderStyle.POISON;
-            case "ocean"     -> TooltipBorderStyle.OCEAN;
-            case "rustic"    -> TooltipBorderStyle.RUSTIC;
-            case "honey"     -> TooltipBorderStyle.HONEY;
-            case "jade"      -> TooltipBorderStyle.JADE;
-            case "wood"      -> TooltipBorderStyle.WOOD;
-            case "stone"     -> TooltipBorderStyle.STONE;
-            case "iron"      -> TooltipBorderStyle.IRON;
-            case "gold"      -> TooltipBorderStyle.GOLD;
-            case "diamond"   -> TooltipBorderStyle.DIAMOND;
-            case "netherite" -> TooltipBorderStyle.NETHERITE;
-            case "runic"     -> TooltipBorderStyle.RUNIC;
-            default          -> TooltipBorderStyle.DEFAULT;
-        };
+    /**
+     * Resolves which border this stack draws, as a key for {@link BorderDefinitionRegistry}.
+     *
+     * <p>Priority: an explicit {@code border} entry in {@code item_themes} (component → item → tag)
+     * wins, because that is a deliberate authored override — this is what lets a rarity restyle only
+     * the frame while the item keeps its own theme. Otherwise the resolved theme's own {@code border}
+     * applies, which for themes written before borders existed is their {@code motif}.
+     */
+    private static String resolveBorderKey(ItemStack stack, ThemeDefinition themeDef) {
+        String dataKey = ItemThemeRegistry.resolveBorderForStack(stack);
+        return dataKey != null ? dataKey : themeDef.border();
     }
 
     /**
      * Resolves the {@link ThemeDefinition} to use for this tooltip using the priority chain:
      * <ol>
-     *   <li>Exact per-item mapping from {@link ItemThemeRegistry} (hard override)</li>
+     *   <li>Component mapping from {@link ItemThemeRegistry}</li>
+     *   <li>Exact per-item mapping from {@link ItemThemeRegistry}</li>
      *   <li>Provider-supplied {@code model.themeKey()} (e.g. mod-specific defaults)</li>
      *   <li>Per-tag mapping from {@link ItemThemeRegistry}</li>
      *   <li>Vanilla item rarity (common / uncommon / rare / epic)</li>
@@ -1023,21 +1013,26 @@ public class TooltipRenderer {
      * </ol>
      */
     private static ThemeDefinition resolveTheme(ItemStack stack, ModernTooltipModel model) {
-        // 1. Data-driven exact item mapping (always wins)
+        // 1. Data-driven component mapping (always wins)
+        String componentDataKey = ItemThemeRegistry.resolveComponentThemeForStack(stack);
+        if (componentDataKey != null)
+            return ThemeRegistry.get(componentDataKey);
+
+        // 2. Data-driven exact item mapping
         String itemDataKey = ItemThemeRegistry.resolveItemThemeForStack(stack);
         if (itemDataKey != null)
             return ThemeRegistry.get(itemDataKey);
 
-        // 2. Provider-supplied default
+        // 3. Provider-supplied default
         if (model.themeKey() != null)
             return ThemeRegistry.get(model.themeKey());
 
-        // 3. Data-driven tag mapping
+        // 4. Data-driven tag mapping
         String tagDataKey = ItemThemeRegistry.resolveTagThemeForStack(stack);
         if (tagDataKey != null)
             return ThemeRegistry.get(tagDataKey);
 
-        // 4. Rarity fallback
+        // 5. Rarity fallback
         Rarity rarity = stack.getRarity();
         return ThemeRegistry.get(rarityThemeKey(rarity != null ? rarity : Rarity.COMMON));
     }
@@ -1304,6 +1299,7 @@ public class TooltipRenderer {
     private static AbilitySectionData prepareAbilitySection(ItemStack stack, List<String> abilityLines) {
         List<String> lines = new ArrayList<>(abilityLines);
         String header = DEFAULT_ABILITY_HEADER;
+        String extractedAbilityHeader = null;
 
         if (!stack.isIn(SIMPLY_SWORDS_COMPAT_TAG)) {
             return new AbilitySectionData(header, lines);
@@ -1323,13 +1319,42 @@ public class TooltipRenderer {
 
             String abilityName = matcher.group(1).trim();
             if (!abilityName.isEmpty()) {
-                header = abilityName;
+                extractedAbilityHeader = abilityName;
                 lines.remove(i);
             }
             break;
         }
 
+        if (startsWithImplicitSection(lines)) {
+            header = "Implicit";
+            lines.remove(0);
+            if (extractedAbilityHeader != null) {
+                int insertIndex = Math.min(1, lines.size());
+                lines.add(insertIndex, ModernTooltipModel.SECTION_MARKER + extractedAbilityHeader);
+            } else if (hasDescriptionAfterImplicit(lines)) {
+                lines.add(1, ModernTooltipModel.SECTION_MARKER + DEFAULT_ABILITY_HEADER);
+            }
+        } else if (extractedAbilityHeader != null) {
+            header = extractedAbilityHeader;
+        }
+
         return new AbilitySectionData(header, lines);
+    }
+
+    private static boolean isCooldownLine(String line) {
+        return line != null && line.stripLeading().startsWith(COOLDOWN_LINE_PREFIX);
+    }
+
+    private static boolean startsWithImplicitSection(List<String> lines) {
+        if (lines.isEmpty() || lines.get(0) == null || !lines.get(0).startsWith(ModernTooltipModel.SECTION_MARKER)) {
+            return false;
+        }
+        return "Implicit".equals(lines.get(0).substring(ModernTooltipModel.SECTION_MARKER.length()).trim());
+    }
+
+    private static boolean hasDescriptionAfterImplicit(List<String> lines) {
+        return lines.size() > 1 && lines.get(1) != null && !lines.get(1).isBlank()
+                && !lines.get(1).startsWith(ModernTooltipModel.SECTION_MARKER);
     }
 
     private static boolean isSimplyBowsStack(ItemStack stack) {
@@ -1647,7 +1672,7 @@ public class TooltipRenderer {
         // --- Cached results ---
         final ModernTooltipModel model;
         final ThemeDefinition    resolvedDef;
-        final int                borderStyle;
+        final BorderDefinition   borderDef;
         final String             resolvedMotifKey;
         final String             itemAnimStyle;
         final String             titleAnimStyle;
@@ -1667,7 +1692,7 @@ public class TooltipRenderer {
 
         ModelBuildCache(ItemStack stack, boolean altDown, int maxW,
                         ModernTooltipModel model, ThemeDefinition resolvedDef,
-                        int borderStyle, String resolvedMotifKey,
+                        BorderDefinition borderDef, String resolvedMotifKey,
                         String itemAnimStyle, String titleAnimStyle, String itemBorderShape,
                         List<String> badges, AbilitySectionData abilitySection,
                         List<String> wrappedAbility, List<String> wrappedCustom,
@@ -1680,7 +1705,7 @@ public class TooltipRenderer {
             this.maxW             = maxW;
             this.model            = model;
             this.resolvedDef      = resolvedDef;
-            this.borderStyle      = borderStyle;
+            this.borderDef        = borderDef;
             this.resolvedMotifKey = resolvedMotifKey;
             this.itemAnimStyle    = itemAnimStyle;
             this.titleAnimStyle   = titleAnimStyle;

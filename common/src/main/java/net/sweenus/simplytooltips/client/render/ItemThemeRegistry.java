@@ -6,6 +6,9 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
+import net.minecraft.nbt.NbtCompound;
+import net.minecraft.nbt.NbtElement;
+import net.minecraft.nbt.NbtList;
 import net.minecraft.registry.Registries;
 import net.minecraft.registry.RegistryKeys;
 import net.minecraft.registry.tag.TagKey;
@@ -22,17 +25,23 @@ import java.util.*;
  * {@code assets/simplytooltips/item_themes/<name>.json}.
  *
  * <p>Multiple files are supported: {@code items} entries are merged (later files win),
- * {@code tags} entries are concatenated in load order (first match wins at resolve time).
+ * {@code components} and {@code tags} entries are concatenated in load order
+ * (first match wins at resolve time).
  *
  * <h3>JSON format</h3>
  * Item values may be a plain theme-key string <em>or</em> an object with optional
- * {@code theme} and {@code badges} fields:
+ * {@code theme}, {@code border} and {@code badges} fields. The three are independent axes — an entry
+ * may set only a border, leaving the theme to be resolved as usual:
  * <pre>{@code
  * {
  *   "items": {
  *     "minecraft:iron_sword": "lightning",
  *     "minecraft:netherite_sword": { "theme": "lightning", "badges": ["SWORD", "NETHERITE"] }
  *   },
+ *   "components": [
+ *     { "component": "mod:rarity=mod:rare", "border": "rarity_rare", "badges": ["RARE"] },
+ *     { "component": "mod:charged", "theme": "lightning" }
+ *   ],
  *   "tags": [
  *     { "tag": "minecraft:swords",   "theme": "lightning", "badges": ["SWORD"] },
  *     { "tag": "minecraft:pickaxes", "theme": "earth" }
@@ -51,8 +60,13 @@ public final class ItemThemeRegistry {
     private static final Map<Identifier, String>       ITEM_THEMES = new HashMap<>();
     /** Exact item-ID → badge list (may be present without a theme entry). */
     private static final Map<Identifier, List<String>> ITEM_BADGES = new HashMap<>();
+    /** Exact item-ID → border key (may be present without a theme entry). */
+    private static final Map<Identifier, String>       ITEM_BORDERS = new HashMap<>();
 
-    /** Ordered tag → (theme key?, badge list?) entries.  First match wins at resolve time. */
+    /** Ordered component → (value?, theme key?, border key?, badge list?) entries. First match wins. */
+    private static final List<ComponentEntry> COMPONENT_ENTRIES = new ArrayList<>();
+
+    /** Ordered tag → (theme key?, border key?, badge list?) entries.  First match wins at resolve time. */
     private static final List<TagEntry> TAG_ENTRIES = new ArrayList<>();
 
     // -------------------------------------------------------------------------
@@ -62,17 +76,33 @@ public final class ItemThemeRegistry {
     /**
      * Returns the theme key for the given stack, or {@code null} if no mapping exists.
      *
-     * <p>Priority: exact item-ID match → first matching tag.
+     * <p>Priority: first matching component → exact item-ID match → first matching tag.
      */
     public static @Nullable String resolveForStack(ItemStack stack) {
+        String componentTheme = resolveComponentThemeForStack(stack);
+        if (componentTheme != null) return componentTheme;
         String itemTheme = resolveItemThemeForStack(stack);
         if (itemTheme != null) return itemTheme;
         return resolveTagThemeForStack(stack);
     }
 
-    /** Returns {@code true} if the stack has a theme mapping via exact item id or tag. */
+    /** Returns {@code true} if the stack has a theme mapping via component, exact item id, or tag. */
     public static boolean hasThemeForStack(ItemStack stack) {
-        return resolveItemThemeForStack(stack) != null || resolveTagThemeForStack(stack) != null;
+        return resolveComponentThemeForStack(stack) != null
+                || resolveItemThemeForStack(stack) != null
+                || resolveTagThemeForStack(stack) != null;
+    }
+
+    /** Returns only the first matching component theme, or {@code null}. */
+    public static @Nullable String resolveComponentThemeForStack(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) return null;
+
+        for (ComponentEntry entry : COMPONENT_ENTRIES) {
+            if (entry.themeKey() != null && componentEntryMatches(stack, entry))
+                return entry.themeKey();
+        }
+
+        return null;
     }
 
     /** Returns only an exact item-ID theme match, or {@code null}. */
@@ -98,10 +128,14 @@ public final class ItemThemeRegistry {
     /**
      * Returns the badge list for the given stack, or {@code null} if no override exists.
      *
-     * <p>Priority: exact item-ID match → first matching tag that has a badges entry.
+     * <p>Priority: first matching component with badges → exact item-ID match
+     * → first matching tag that has a badges entry.
      */
     public static @Nullable List<String> resolveBadgesForStack(ItemStack stack) {
         if (stack == null || stack.isEmpty()) return null;
+
+        List<String> componentBadges = resolveComponentBadgesForStack(stack);
+        if (componentBadges != null) return componentBadges;
 
         Identifier id = Registries.ITEM.getId(stack.getItem());
 
@@ -110,6 +144,46 @@ public final class ItemThemeRegistry {
 
         for (TagEntry entry : TAG_ENTRIES) {
             if (entry.badges() != null && stack.isIn(entry.tag()))
+                return entry.badges();
+        }
+
+        return null;
+    }
+
+    /**
+     * Returns the border key for the given stack, or {@code null} if no mapping exists.
+     *
+     * <p>Priority: first matching component with a border → exact item-ID match → first matching tag
+     * that has a border entry. Mirrors {@link #resolveBadgesForStack(ItemStack)}: a border is an
+     * independent axis, so an entry can restyle only the frame and leave the theme alone. That is how
+     * rarity mappings work — {@code { "component": "apotheosis:rarity=apotheosis:mythic",
+     * "border": "rarity_mythic" }} keeps the item's own theme and changes only its border.
+     */
+    public static @Nullable String resolveBorderForStack(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) return null;
+
+        for (ComponentEntry entry : COMPONENT_ENTRIES) {
+            if (entry.borderKey() != null && componentEntryMatches(stack, entry))
+                return entry.borderKey();
+        }
+
+        String itemBorder = ITEM_BORDERS.get(Registries.ITEM.getId(stack.getItem()));
+        if (itemBorder != null) return itemBorder;
+
+        for (TagEntry entry : TAG_ENTRIES) {
+            if (entry.borderKey() != null && stack.isIn(entry.tag()))
+                return entry.borderKey();
+        }
+
+        return null;
+    }
+
+    /** Returns only the first matching component badge list, or {@code null}. */
+    public static @Nullable List<String> resolveComponentBadgesForStack(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) return null;
+
+        for (ComponentEntry entry : COMPONENT_ENTRIES) {
+            if (entry.badges() != null && componentEntryMatches(stack, entry))
                 return entry.badges();
         }
 
@@ -127,6 +201,8 @@ public final class ItemThemeRegistry {
     public static void loadAll(ResourceManager manager) {
         ITEM_THEMES.clear();
         ITEM_BADGES.clear();
+        ITEM_BORDERS.clear();
+        COMPONENT_ENTRIES.clear();
         TAG_ENTRIES.clear();
 
         Map<Identifier, net.minecraft.resource.Resource> resources = manager.findResources(
@@ -141,7 +217,7 @@ public final class ItemThemeRegistry {
 
                 // --- "items" section ---
                 // Each value is either a plain theme-key string or an object:
-                //   { "theme": "optional_key", "badges": ["A", "B"] }
+                //   { "theme": "optional_key", "border": "optional_key", "badges": ["A", "B"] }
                 if (json.has("items") && json.get("items").isJsonObject()) {
                     for (Map.Entry<String, JsonElement> itemEntry
                             : json.getAsJsonObject("items").entrySet()) {
@@ -158,6 +234,10 @@ public final class ItemThemeRegistry {
                             if (obj.has("theme")) {
                                 ITEM_THEMES.put(itemId, obj.get("theme").getAsString());
                             }
+                            String itemBorder = parseBorderKey(obj);
+                            if (itemBorder != null) {
+                                ITEM_BORDERS.put(itemId, itemBorder);
+                            }
                             List<String> badges = parseBadgeArray(obj);
                             if (badges != null) {
                                 ITEM_BADGES.put(itemId, badges);
@@ -166,8 +246,25 @@ public final class ItemThemeRegistry {
                     }
                 }
 
+                // --- "components" section ---
+                // Each entry:
+                //   { "component": "ns:id", "value": "optional_value", "theme": "optional_key",
+                //     "border": "optional_key", "badges": ["A"] }
+                // Shorthand is also supported:
+                //   { "component": "ns:id=optional_value", "theme": "optional_key" }
+                if (json.has("components") && json.get("components").isJsonArray()) {
+                    for (JsonElement el : json.getAsJsonArray("components")) {
+                        if (!el.isJsonObject()) continue;
+                        JsonObject componentObj = el.getAsJsonObject();
+                        ComponentEntry componentEntry = parseComponentEntry(componentObj);
+                        if (componentEntry != null) {
+                            COMPONENT_ENTRIES.add(componentEntry);
+                        }
+                    }
+                }
+
                 // --- "tags" section ---
-                // Each entry: { "tag": "ns:id", "theme": "optional_key", "badges": ["A"] }
+                // Each entry: { "tag": "ns:id", "theme": "optional_key", "border": "optional_key", "badges": ["A"] }
                 if (json.has("tags") && json.get("tags").isJsonArray()) {
                     for (JsonElement el : json.getAsJsonArray("tags")) {
                         if (!el.isJsonObject()) continue;
@@ -179,11 +276,12 @@ public final class ItemThemeRegistry {
 
                         String themeKey = tagObj.has("theme")
                                 ? tagObj.get("theme").getAsString() : null;
+                        String borderKey = parseBorderKey(tagObj);
                         List<String> badges = parseBadgeArray(tagObj);
 
-                        if (themeKey != null || badges != null) {
+                        if (themeKey != null || borderKey != null || badges != null) {
                             TAG_ENTRIES.add(new TagEntry(
-                                    TagKey.of(RegistryKeys.ITEM, tagId), themeKey, badges));
+                                    TagKey.of(RegistryKeys.ITEM, tagId), themeKey, borderKey, badges));
                         }
                     }
                 }
@@ -194,13 +292,25 @@ public final class ItemThemeRegistry {
             }
         }
 
-        SimplyTooltips.LOGGER.info("[SimplyTooltips] Loaded {} item theme(s), {} item badge override(s), {} tag entries",
-                ITEM_THEMES.size(), ITEM_BADGES.size(), TAG_ENTRIES.size());
+        SimplyTooltips.LOGGER.info("[SimplyTooltips] Loaded {} item theme(s), {} item badge override(s), {} item border override(s), {} component entries, {} tag entries",
+                ITEM_THEMES.size(), ITEM_BADGES.size(), ITEM_BORDERS.size(),
+                COMPONENT_ENTRIES.size(), TAG_ENTRIES.size());
     }
 
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
+
+    /**
+     * Reads an entry's border key, accepting {@code "border"} or the {@code "borderStyle"} spelling
+     * used by theme files (where {@code border} is already the frame colour). Returns {@code null}
+     * when neither is present.
+     */
+    private static @Nullable String parseBorderKey(JsonObject obj) {
+        if (obj.has("border")) return obj.get("border").getAsString();
+        if (obj.has("borderStyle")) return obj.get("borderStyle").getAsString();
+        return null;
+    }
 
     /** Reads the {@code "badges"} string array from a JSON object, or returns {@code null}. */
     private static @Nullable List<String> parseBadgeArray(JsonObject obj) {
@@ -213,7 +323,93 @@ public final class ItemThemeRegistry {
         return list.isEmpty() ? null : Collections.unmodifiableList(list);
     }
 
-    private record TagEntry(TagKey<Item> tag, @Nullable String themeKey, @Nullable List<String> badges) {}
+    private static @Nullable ComponentEntry parseComponentEntry(JsonObject obj) {
+        if (!obj.has("component")) return null;
+
+        String componentText = obj.get("component").getAsString();
+        String valueText = obj.has("value") ? obj.get("value").getAsString() : null;
+
+        int shorthandSeparator = componentText.indexOf('=');
+        if (shorthandSeparator >= 0) {
+            if (valueText == null) valueText = componentText.substring(shorthandSeparator + 1);
+            componentText = componentText.substring(0, shorthandSeparator);
+        }
+
+        Identifier componentId = Identifier.tryParse(componentText);
+        if (componentId == null) return null;
+
+        String themeKey = obj.has("theme") ? obj.get("theme").getAsString() : null;
+        String borderKey = parseBorderKey(obj);
+        List<String> badges = parseBadgeArray(obj);
+
+        if (themeKey == null && borderKey == null && badges == null) return null;
+        return new ComponentEntry(componentId, valueText, themeKey, borderKey, badges);
+    }
+
+    private static boolean componentEntryMatches(ItemStack stack, ComponentEntry entry) {
+        NbtCompound nbt = stack.getNbt();
+        if (nbt == null || nbt.isEmpty()) return false;
+
+        NbtElement value = findLegacyComponentValue(nbt, entry.componentId());
+        if (value == null) return false;
+        if (entry.valueKey() == null) return true;
+
+        Set<String> values = new HashSet<>();
+        collectLegacyValues(value, values);
+        return values.contains(entry.valueKey());
+    }
+
+    /**
+     * Minecraft 1.20.1 stores mod item data in stack NBT rather than data components. Component
+     * rules retain the newer JSON format, but resolve their id against legacy NBT keys. The full
+     * namespaced id and its path are checked recursively; this covers layouts such as
+     * {@code affix_data.rarity} used by Apotheosis.
+     */
+    private static @Nullable NbtElement findLegacyComponentValue(NbtElement element, Identifier id) {
+        if (element instanceof NbtCompound compound) {
+            String fullKey = id.toString();
+            String pathKey = id.getPath();
+            if (compound.contains(fullKey)) return compound.get(fullKey);
+            if (compound.contains(pathKey)) return compound.get(pathKey);
+
+            for (String key : compound.getKeys()) {
+                NbtElement found = findLegacyComponentValue(compound.get(key), id);
+                if (found != null) return found;
+            }
+        } else if (element instanceof NbtList list) {
+            for (NbtElement child : list) {
+                NbtElement found = findLegacyComponentValue(child, id);
+                if (found != null) return found;
+            }
+        }
+        return null;
+    }
+
+    private static void collectLegacyValues(NbtElement element, Set<String> values) {
+        values.add(element.asString());
+        if (element instanceof NbtCompound compound) {
+            for (String key : compound.getKeys()) {
+                NbtElement child = compound.get(key);
+                if (child != null) collectLegacyValues(child, values);
+            }
+        } else if (element instanceof NbtList list) {
+            for (NbtElement child : list) {
+                collectLegacyValues(child, values);
+            }
+        }
+    }
+
+    private record ComponentEntry(
+            Identifier componentId,
+            @Nullable String valueKey,
+            @Nullable String themeKey,
+            @Nullable String borderKey,
+            @Nullable List<String> badges) {}
+
+    private record TagEntry(TagKey<Item> tag,
+                            @Nullable String themeKey,
+                            @Nullable String borderKey,
+                            @Nullable List<String> badges) {}
 
     private ItemThemeRegistry() {}
 }

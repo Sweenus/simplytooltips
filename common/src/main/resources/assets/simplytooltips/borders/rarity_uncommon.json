@@ -1,0 +1,8 @@
+{
+  "pattern": "gold",
+  "frame": "0xFFFFFF55",
+  "frameInner": "0xFFAAAA00",
+  "accentA": "0xFFFFFF55",
+  "accentB": "0xFFAAAA00",
+  "accentC": "0xFFFFFF99"
+}

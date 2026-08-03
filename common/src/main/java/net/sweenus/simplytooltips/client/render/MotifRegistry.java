@@ -23,6 +23,7 @@ public class MotifRegistry {
         MOTIFS.put("bubble",    new BubbleMotif());
         MOTIFS.put("earth",     new EarthMotif());
         MOTIFS.put("echo",      new EchoMotif());
+        MOTIFS.put("cosmic",    new CosmicMotif());
         MOTIFS.put("ice",       new IceMotif());
         MOTIFS.put("lightning", new LightningMotif());
         MOTIFS.put("autumn",    new AutumnMotif());

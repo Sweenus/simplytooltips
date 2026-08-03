@@ -57,6 +57,10 @@ public final class SimplySwordsCompatTooltipProvider implements TooltipProvider 
         String title = rawLines.isEmpty() ? stack.getName().getString() : rawLines.get(0).getString();
 
         List<String> abilityLines = parseAbilityLines(rawLines);
+        List<String> implicitLines = parseImplicitLines(rawLines);
+        if (!implicitLines.isEmpty()) {
+            abilityLines.addAll(0, implicitLines);
+        }
         List<Text>   extraLines   = parseExtraLines(rawLines);
         Text         hint         = parseHintLine(rawLines);
 
@@ -73,7 +77,8 @@ public final class SimplySwordsCompatTooltipProvider implements TooltipProvider 
                 null,
                 null,
                 null,
-                hint
+                hint,
+                List.of()
         );
     }
 
@@ -90,23 +95,41 @@ public final class SimplySwordsCompatTooltipProvider implements TooltipProvider 
         List<String> result = new ArrayList<>();
         String attrMain = Text.translatable("item.modifiers.mainhand").getString();
         String attrOff  = Text.translatable("item.modifiers.offhand").getString();
+        String implicitHeader = Text.translatable("tooltip.simplyswords.implicit.header").getString();
+        String runicHeader = "Runic Power";
 
         boolean seenContent = false;
+        boolean inRunicSection = false;
 
         for (int i = 1; i < rawLines.size(); i++) {
             String s = rawLines.get(i).getString();
             if (s.equals(attrMain) || s.equals(attrOff)) break;
             if (isButtonHint(s)) continue;
+            if (s.equals(implicitHeader)) {
+                i = skipImplicitValue(rawLines, i, attrMain, attrOff);
+                continue;
+            }
 
             if (s.isBlank()) {
                 if (seenContent) result.add("");  // blank line between paragraphs → visual gap
-            } else if (isSectionHeader(s)) {
+            } else if (isRunicPowerLine(s) || isRunicModifierLine(s)) {
+                if (!inRunicSection) {
+                    if (!result.isEmpty() && result.get(result.size() - 1).isBlank()) {
+                        result.remove(result.size() - 1);
+                    }
+                    result.add(ModernTooltipModel.SECTION_MARKER + runicHeader);
+                    inRunicSection = true;
+                }
+                result.add(formatRunicLine(s));
+                seenContent = true;
+            } else if (isSectionHeader(s) && !inRunicSection) {
                 // Consume the preceding blank so the renderer's separator replaces it
                 if (!result.isEmpty() && result.get(result.size() - 1).isBlank()) {
                     result.remove(result.size() - 1);
                 }
                 result.add(ModernTooltipModel.SECTION_MARKER + s);
                 seenContent = true;
+                inRunicSection = false;
             } else {
                 seenContent = true;
                 result.add(s);
@@ -118,6 +141,18 @@ public final class SimplySwordsCompatTooltipProvider implements TooltipProvider 
             result.remove(result.size() - 1);
         }
         return result;
+    }
+
+    private static int skipImplicitValue(List<Text> rawLines, int headerIndex, String attrMain, String attrOff) {
+        int i = headerIndex;
+        for (int j = headerIndex + 1; j < rawLines.size(); j++) {
+            String line = rawLines.get(j).getString();
+            if (line.isBlank() || line.equals(attrMain) || line.equals(attrOff) || isSectionHeader(line) || isButtonHint(line)) {
+                break;
+            }
+            i = j;
+        }
+        return i;
     }
 
     /**
@@ -135,6 +170,35 @@ public final class SimplySwordsCompatTooltipProvider implements TooltipProvider 
             if (s.equals(attrMain) || s.equals(attrOff)) inAttr = true;
             if (inAttr) result.add(rawLines.get(i));
         }
+        return result;
+    }
+
+    private static List<String> parseImplicitLines(List<Text> rawLines) {
+        List<String> result = new ArrayList<>();
+        String implicitHeader = Text.translatable("tooltip.simplyswords.implicit.header").getString();
+        String attrMain = Text.translatable("item.modifiers.mainhand").getString();
+        String attrOff = Text.translatable("item.modifiers.offhand").getString();
+
+        for (int i = 1; i < rawLines.size(); i++) {
+            String s = rawLines.get(i).getString();
+            if (s.equals(attrMain) || s.equals(attrOff)) {
+                break;
+            }
+            if (!s.equals(implicitHeader)) {
+                continue;
+            }
+
+            result.add(ModernTooltipModel.SECTION_MARKER + implicitHeader);
+            for (int j = i + 1; j < rawLines.size(); j++) {
+                String line = rawLines.get(j).getString();
+                if (line.isBlank() || line.equals(attrMain) || line.equals(attrOff) || isSectionHeader(line) || isButtonHint(line)) {
+                    break;
+                }
+                result.add(line);
+            }
+            break;
+        }
+
         return result;
     }
 
@@ -178,5 +242,20 @@ public final class SimplySwordsCompatTooltipProvider implements TooltipProvider 
             if (lower.contains(prefix)) return true;
         }
         return false;
+    }
+
+    private static boolean isRunicPowerLine(String s) {
+        return s != null && s.startsWith("Runic Power:");
+    }
+
+    private static boolean isRunicModifierLine(String s) {
+        return "Greater".equals(s);
+    }
+
+    private static String formatRunicLine(String s) {
+        if (isRunicPowerLine(s)) {
+            return s.substring("Runic Power:".length()).trim();
+        }
+        return s;
     }
 }

@@ -19,6 +19,9 @@ import java.util.List;
  * {@link #SECTION_MARKER} for sub-section headers (e.g. "Affixes", "Sockets").
  * If {@code null}, no AFFIXES tab is added.
  *
+ * <p>{@code itemFrameProgress} (field 13) is optional progress metadata drawn over the
+ * themed item frame in the tooltip header.
+ *
  * <p>{@link #SECTION_MARKER} can be prepended to {@code abilityLines} or {@code affixLines}
  * entries to request sub-section header rendering (separator above + {@code sectionHeader}
  * colour + "◆ " prefix).
@@ -35,7 +38,8 @@ public record ModernTooltipModel(
         String animKeyExtra,
         String themeKey,        // nullable; if set, ThemeRegistry overrides theme + borderStyle
         Text hint,              // nullable; rendered below badges in the header area
-        List<String> affixLines // nullable; if non-empty, adds a dedicated AFFIXES tab
+        List<String> affixLines, // nullable; if non-empty, adds a dedicated AFFIXES tab
+        ItemFrameProgress itemFrameProgress // nullable; progress overlay for the item frame
 ) {
     /**
      * Prefix marker for ability/affix lines that should be rendered as sub-section headers.
@@ -65,6 +69,19 @@ public record ModernTooltipModel(
                                UpgradeSection upgradeSection, String animKeyExtra,
                                String themeKey, Text hint) {
         this(title, badges, borderStyle, abilityLines, bodyLines, extraLines, theme,
-                upgradeSection, animKeyExtra, themeKey, hint, null);
+                upgradeSection, animKeyExtra, themeKey, hint, null, null);
+    }
+
+    /**
+     * Legacy 12-parameter constructor retained for providers compiled against the
+     * affix-enabled model.
+     */
+    public ModernTooltipModel(String title, List<String> badges, int borderStyle,
+                              List<String> abilityLines, List<String> bodyLines,
+                              List<Text> extraLines, TooltipTheme theme,
+                              UpgradeSection upgradeSection, String animKeyExtra,
+                              String themeKey, Text hint, List<String> affixLines) {
+        this(title, badges, borderStyle, abilityLines, bodyLines, extraLines, theme,
+                upgradeSection, animKeyExtra, themeKey, hint, affixLines, null);
     }
 }

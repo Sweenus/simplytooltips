@@ -6,11 +6,15 @@ import net.minecraft.text.Style;
 import net.minecraft.text.Text;
 import net.minecraft.text.TextColor;
 import net.minecraft.util.math.RotationAxis;
+import net.sweenus.simplytooltips.api.ItemFrameProgress;
 import net.sweenus.simplytooltips.api.TooltipTheme;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.regex.Pattern;
 
 /**
  * Static utility methods for drawing common tooltip elements:
@@ -18,6 +22,10 @@ import java.util.concurrent.ThreadLocalRandom;
  * animated title text, plus colour helpers and word-wrap.
  */
 public class TooltipPainter {
+    private static final long ITEM_FRAME_REVEAL_MS = 800L;
+    private static final long ITEM_FRAME_SWEEP_MS = 1100L;
+    private static final long ITEM_FRAME_SWEEP_GAP_MS = 250L;
+    private static final Pattern LEGACY_FORMATTING_CODE = Pattern.compile("(?i)\\u00A7[0-9A-FK-ORX]");
 
     // State for one-shot "hinge_fall" title animation (resets when tooltip animation resets).
     private static long   hingeLastElapsedMs = -1L;
@@ -81,6 +89,185 @@ public class TooltipPainter {
             case "none"    -> { /* no frame */ }
             default        -> drawDiamondFrame(context, x, y, size, theme);
         }
+    }
+
+    /**
+     * Draws a one-pixel-wide clockwise progress trace immediately outside the
+     * active item-frame geometry. The trace grows in when the tooltip opens,
+     * then carries a tapered white highlight within the completed portion.
+     */
+    public static void drawItemFrameProgress(DrawContext context, int x, int y, int size,
+                                             String shape, ItemFrameProgress progress,
+                                             long tooltipElapsedMs) {
+        if (progress == null || progress.value() <= 0) return;
+        float revealT = Math.max(0.0F, Math.min(
+                tooltipElapsedMs / (float) ITEM_FRAME_REVEAL_MS, 1.0F));
+        revealT = easeOutCubic(revealT);
+
+        long sweepCycleMs = ITEM_FRAME_SWEEP_MS + ITEM_FRAME_SWEEP_GAP_MS;
+        long sweepPhaseMs = (tooltipElapsedMs - ITEM_FRAME_REVEAL_MS) % sweepCycleMs;
+        boolean revealing = tooltipElapsedMs < ITEM_FRAME_REVEAL_MS;
+        boolean sweeping = !revealing && sweepPhaseMs < ITEM_FRAME_SWEEP_MS;
+        float sweepT = sweeping ? sweepPhaseMs / (float) ITEM_FRAME_SWEEP_MS : 0.0F;
+
+        List<int[]> path = itemFramePath(x, y, size, shape, 1);
+        if (!path.isEmpty()) {
+            drawFrameProgressContour(context, path, progress, revealT, revealing, sweeping, sweepT);
+        }
+    }
+
+    /** Draws the static value label associated with an item-frame progress trace. */
+    public static void drawItemFrameProgressLabel(DrawContext context, TextRenderer tr,
+                                                  ItemFrameProgress progress,
+                                                  int x, int y, long timeMs) {
+        if (progress == null) return;
+        context.drawText(tr, progress.levelLabel(), x, y, progress.progressColor(), true);
+    }
+
+    private static void drawFrameHighlight(DrawContext context, List<int[]> path,
+                                           int head, int highlightLength, int limit,
+                                           ItemFrameProgress progress) {
+        for (int distance = 0; distance < highlightLength; distance++) {
+            int index = head - distance;
+            if (index < 0 || index >= limit || index >= path.size()) continue;
+            float strength = 1.0F - distance / (float) highlightLength;
+            int color = lerpColor(progress.progressColor(), progress.highlightColor(), strength);
+            int[] point = path.get(index);
+            context.fill(point[0], point[1], point[0] + 1, point[1] + 1, color);
+        }
+    }
+
+    private static void drawFrameProgressContour(DrawContext context, List<int[]> path,
+                                                 ItemFrameProgress progress, float revealT,
+                                                 boolean revealing, boolean sweeping, float sweepT) {
+        int targetLength = Math.max(0, Math.min(
+                Math.round(path.size() * progress.fraction()), path.size()));
+        int displayedLength = Math.max(0, Math.min(
+                Math.round(targetLength * revealT), targetLength));
+
+        for (int i = 0; i < displayedLength; i++) {
+            int[] point = path.get(i);
+            context.fill(point[0], point[1],
+                    point[0] + 1, point[1] + 1, progress.progressColor());
+        }
+
+        if (displayedLength <= 0) return;
+        int highlightLength = Math.min(7, Math.max(3, targetLength / 5));
+        if (revealing) {
+            drawFrameHighlight(context, path, displayedLength - 1,
+                    highlightLength, displayedLength, progress);
+        } else if (sweeping) {
+            int head = Math.round(sweepT * (targetLength + highlightLength - 1));
+            drawFrameHighlight(context, path, head, highlightLength, targetLength, progress);
+        }
+    }
+
+    private static List<int[]> itemFramePath(int x, int y, int size, String shape, int expansion) {
+        String resolvedShape = shape == null ? "diamond" : shape;
+        if ("none".equals(resolvedShape)) return List.of();
+
+        int cx = x + size / 2;
+        int cy = y + size / 2;
+        int half = size / 2;
+        int minX = x - expansion;
+        int minY = y - expansion;
+        int maxX = x + size - 1 + expansion;
+        int maxY = y + size - 1 + expansion;
+        List<int[]> path = new ArrayList<>();
+
+        switch (resolvedShape) {
+            case "square" -> {
+                appendLine(path, cx, minY, maxX - 1, minY);
+                appendLine(path, maxX - 1, minY, maxX, minY + 1);
+                appendLine(path, maxX, minY + 1, maxX, maxY - 1);
+                appendLine(path, maxX, maxY - 1, maxX - 1, maxY);
+                appendLine(path, maxX - 1, maxY, minX + 1, maxY);
+                appendLine(path, minX + 1, maxY, minX, maxY - 1);
+                appendLine(path, minX, maxY - 1, minX, minY + 1);
+                appendLine(path, minX, minY + 1, minX + 1, minY);
+                appendLine(path, minX + 1, minY, cx, minY);
+            }
+            case "circle" -> {
+                int radius = size / 2 - 1 + expansion;
+                int samples = Math.max(64, (size + expansion * 2) * 8);
+                Set<Long> seen = new HashSet<>();
+                for (int i = 0; i < samples; i++) {
+                    double angle = -Math.PI / 2.0D + Math.PI * 2.0D * i / samples;
+                    int px = cx + (int) Math.round(Math.cos(angle) * radius);
+                    int py = cy + (int) Math.round(Math.sin(angle) * radius);
+                    long packed = ((long) px << 32) ^ (py & 0xFFFFFFFFL);
+                    if (seen.add(packed)) path.add(new int[]{px, py});
+                }
+            }
+            case "cross" -> {
+                int arm = size / 4;
+                int armRight = cx + arm - 1 + expansion;
+                int armLeft = cx - arm - 1 - expansion;
+                int armTop = cy - arm - 1 - expansion;
+                int armBottom = cy + arm + expansion;
+                appendLine(path, cx, minY, armRight, minY);
+                appendLine(path, armRight, minY, armRight, armTop);
+                appendLine(path, armRight, armTop, maxX, armTop);
+                appendLine(path, maxX, armTop, maxX, armBottom);
+                appendLine(path, maxX, armBottom, cx + arm + expansion, armBottom);
+                appendLine(path, cx + arm + expansion, armBottom,
+                        cx + arm + expansion, maxY);
+                appendLine(path, cx + arm + expansion, maxY, armLeft, maxY);
+                appendLine(path, armLeft, maxY, armLeft, armBottom);
+                appendLine(path, armLeft, armBottom, minX, armBottom);
+                appendLine(path, minX, armBottom, minX, armTop);
+                appendLine(path, minX, armTop, armLeft, armTop);
+                appendLine(path, armLeft, armTop, armLeft, minY);
+                appendLine(path, armLeft, minY, cx, minY);
+            }
+            default -> {
+                int radius = half + expansion;
+                appendLine(path, cx, cy - radius, cx + radius, cy);
+                appendLine(path, cx + radius, cy, cx, cy + radius);
+                appendLine(path, cx, cy + radius, cx - radius, cy);
+                appendLine(path, cx - radius, cy, cx, cy - radius);
+            }
+        }
+
+        if (path.size() > 1) {
+            int[] first = path.get(0);
+            int[] last = path.get(path.size() - 1);
+            if (first[0] == last[0] && first[1] == last[1]) {
+                path.remove(path.size() - 1);
+            }
+        }
+        return path;
+    }
+
+    private static void appendLine(List<int[]> path, int x0, int y0, int x1, int y1) {
+        int dx = Math.abs(x1 - x0);
+        int sx = x0 < x1 ? 1 : -1;
+        int dy = -Math.abs(y1 - y0);
+        int sy = y0 < y1 ? 1 : -1;
+        int error = dx + dy;
+
+        while (true) {
+            if (path.isEmpty()
+                    || path.get(path.size() - 1)[0] != x0
+                    || path.get(path.size() - 1)[1] != y0) {
+                path.add(new int[]{x0, y0});
+            }
+            if (x0 == x1 && y0 == y1) break;
+            int twiceError = 2 * error;
+            if (twiceError >= dy) {
+                error += dy;
+                x0 += sx;
+            }
+            if (twiceError <= dx) {
+                error += dx;
+                y0 += sy;
+            }
+        }
+    }
+
+    private static float easeOutCubic(float t) {
+        float inverse = 1.0F - t;
+        return 1.0F - inverse * inverse * inverse;
     }
 
     /** Diamond frame (24×24 default) around the item icon slot. */
@@ -851,7 +1038,12 @@ public class TooltipPainter {
                 wrapped.add(" ");
                 continue;
             }
-            String[] words = raw.split("\\s+");
+            String normalized = LEGACY_FORMATTING_CODE.matcher(raw).replaceAll("");
+            if (normalized.isEmpty()) {
+                wrapped.add(" ");
+                continue;
+            }
+            String[] words = normalized.split("\\s+");
             StringBuilder current = new StringBuilder();
             for (String word : words) {
                 String candidate = current.isEmpty() ? word : current + " " + word;

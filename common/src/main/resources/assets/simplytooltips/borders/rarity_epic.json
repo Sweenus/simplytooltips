@@ -1,0 +1,9 @@
+{
+  "pattern": "enchanted",
+  "frame": "0xFFFF55FF",
+  "frameInner": "0xFFAA00AA",
+  "accentA": "0xFFFF88FF",
+  "accentB": "0xFFCC00CC",
+  "accentC": "0xFFAA00AA",
+  "accentD": "0xFFFFCCFF"
+}

@@ -1,5 +1,14 @@
 package net.sweenus.simplytooltips.api;
 
+/**
+ * Legacy integer identifiers for the built-in border patterns.
+ *
+ * @deprecated Borders are keyed by string now. See
+ *             {@link net.sweenus.simplytooltips.client.render.BorderRegistry}, which is also how a mod
+ *             registers its own. These constants are kept so existing code compiles and behaves the
+ *             same; {@link #keyOf(int)} converts one to the corresponding registry key.
+ */
+@Deprecated
 public final class TooltipBorderStyle {
     public static final int DEFAULT = 0;
     public static final int VINE    = 1;
@@ -27,6 +36,38 @@ public final class TooltipBorderStyle {
     public static final int DIAMOND = 23;
     public static final int NETHERITE = 24;
     public static final int RUNIC = 25;
+
+    /** Maps a legacy constant to its border pattern key; unknown values map to {@code "none"}. */
+    public static String keyOf(int borderStyle) {
+        return switch (borderStyle) {
+            case VINE      -> "vine";
+            case BEE       -> "bee";
+            case BLOSSOM   -> "blossom";
+            case BUBBLE    -> "bubble";
+            case EARTH     -> "earth";
+            case ECHO      -> "echo";
+            case ICE       -> "ice";
+            case LIGHTNING -> "lightning";
+            case EMBER     -> "ember";
+            case ENCHANTED -> "enchanted";
+            case AUTUMN    -> "autumn";
+            case SOUL      -> "soul";
+            case DEEP_DARK -> "deepdark";
+            case POISON    -> "poison";
+            case OCEAN     -> "ocean";
+            case RUSTIC    -> "rustic";
+            case HONEY     -> "honey";
+            case JADE      -> "jade";
+            case WOOD      -> "wood";
+            case STONE     -> "stone";
+            case IRON      -> "iron";
+            case GOLD      -> "gold";
+            case DIAMOND   -> "diamond";
+            case NETHERITE -> "netherite";
+            case RUNIC     -> "runic";
+            default        -> "none";
+        };
+    }
 
     private TooltipBorderStyle() {}
 }

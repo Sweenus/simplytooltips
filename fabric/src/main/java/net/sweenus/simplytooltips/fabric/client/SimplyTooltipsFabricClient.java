@@ -10,6 +10,7 @@ import net.minecraft.util.Identifier;
 import net.sweenus.simplytooltips.SimplyTooltips;
 import net.sweenus.simplytooltips.client.TooltipKeybinds;
 import net.sweenus.simplytooltips.client.TooltipNavigationEvents;
+import net.sweenus.simplytooltips.client.render.BorderDefinitionRegistry;
 import net.sweenus.simplytooltips.client.render.ItemThemeRegistry;
 import net.sweenus.simplytooltips.client.render.ThemeRegistry;
 
@@ -40,6 +41,19 @@ public final class SimplyTooltipsFabricClient implements ClientModInitializer {
                     @Override
                     public void reload(ResourceManager manager) {
                         ItemThemeRegistry.loadAll(manager);
+                    }
+                });
+
+        ResourceManagerHelper.get(ResourceType.CLIENT_RESOURCES)
+                .registerReloadListener(new SimpleSynchronousResourceReloadListener() {
+                    @Override
+                    public Identifier getFabricId() {
+                        return Identifier.of(SimplyTooltips.MOD_ID, "borders");
+                    }
+
+                    @Override
+                    public void reload(ResourceManager manager) {
+                        BorderDefinitionRegistry.loadAll(manager);
                     }
                 });
 

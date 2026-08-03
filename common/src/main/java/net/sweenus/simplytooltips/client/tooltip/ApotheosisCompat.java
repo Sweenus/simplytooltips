@@ -1,13 +1,18 @@
 package net.sweenus.simplytooltips.client.tooltip;
 
 import net.minecraft.item.ItemStack;
-import net.minecraft.registry.Registries;
+import net.minecraft.nbt.NbtCompound;
+import net.minecraft.nbt.NbtElement;
+import net.minecraft.nbt.NbtList;
 import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
+import net.minecraft.text.TextContent;
+import net.minecraft.text.TranslatableTextContent;
 import net.sweenus.simplytooltips.api.ModernTooltipModel;
 
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Predicate;
 
 /**
  * Post-processes a {@link ModernTooltipModel} to properly surface Apotheosis
@@ -18,8 +23,9 @@ import java.util.List;
  *   <li>Apotheosis affix effect lines — plain-text bullet lines (U+2022 •) injected by
  *       {@code ItemTooltipEvent}. rawLines is used as the authoritative source.</li>
  *   <li>"Can be Imbued" lines — Apotheosis imbue indicator.</li>
- *   <li>Socket summary — replaces the {@code "APOTH_SOCKET_MARKER"} sentinel injected by
- *       Apotheosis's {@code AddAttributeTooltipsEvent} handler.</li>
+ *   <li>Additional attribute modifier lines added by Apotheosis affixes/gems/imbues.</li>
+ *   <li>Socket summary — replaces the hidden sentinel injected by Apotheosis's
+ *       attribute-tooltip handler.</li>
  * </ul>
  *
  * <h3>Algorithm</h3>
@@ -29,12 +35,13 @@ import java.util.List;
  *   <li>Strip Apotheosis lines from {@code abilityLines} (LORE tab), {@code bodyLines} (STATS tab),
  *       and the socket-marker sentinel from {@code extraLines} so each section stays clean.</li>
  *   <li>Build {@code affixLines}: affix bullets separated by subtle {@link ModernTooltipModel#AFFIX_DIVIDER}
- *       lines under a {@code SECTION_MARKER+"Affixes"} header, followed by a socket summary section
- *       if sockets are present.</li>
+ *       lines under a {@code SECTION_MARKER+"Affixes"} header, followed by any bonus attributes
+ *       and a socket summary section if present.</li>
  * </ol>
  *
  * <p>This class carries no compile-time dependency on the Apotheosis API. All detection is
- * text-pattern based; DataComponent access uses the Minecraft registry by string ID.
+ * text-pattern based; socket details are accessed through the legacy 1.20.1 API reflectively,
+ * with a direct NBT fallback for compatibility.
  */
 public final class ApotheosisCompat {
 
@@ -50,8 +57,20 @@ public final class ApotheosisCompat {
     /** U+25C7 — white diamond; used for an empty socket pip. */
     private static final String SOCKET_EMPTY = "\u25C7";
 
-    /** Sentinel injected by Apotheosis {@code AddAttributeTooltipsEvent} for socket rendering. */
+    /** Sentinel used by Apotheosis 1.20.1 before it replaces the row with its socket component. */
+    private static final String APOTH_REMOVE_MARKER = "APOTH_REMOVE_MARKER";
+
+    /** Later Apotheosis versions renamed the sentinel; accepting both is harmless and resilient. */
     private static final String APOTH_SOCKET_MARKER = "APOTH_SOCKET_MARKER";
+
+    private static final String AFFIX_DATA_NBT = "affix_data";
+    private static final String SOCKETS_NBT = "sockets";
+    private static final String GEMS_NBT = "gems";
+
+    private static final String SLOT_HEADER_PREFIX = "item.modifiers.";
+    private static final String ATTRIBUTE_MODIFIER_PREFIX = "attribute.modifier.";
+    private static final String ATTACK_DAMAGE_KEY = "attribute.name.generic.attack_damage";
+    private static final String ATTACK_SPEED_KEY = "attribute.name.generic.attack_speed";
 
     private ApotheosisCompat() {}
 
@@ -90,7 +109,7 @@ public final class ApotheosisCompat {
      *
      * @param model    model produced by any {@link net.sweenus.simplytooltips.api.TooltipProvider}
      * @param rawLines full raw tooltip lines passed to the provider
-     * @param stack    the item stack being tooltipped (used for DataComponent socket lookup)
+     * @param stack    the item stack being tooltipped (used for optional socket lookup)
      * @param altDown  whether the Alt key is currently held (shows gem descriptions when true)
      * @return augmented model, or {@code model} unchanged if no Apotheosis content found
      */
@@ -99,38 +118,56 @@ public final class ApotheosisCompat {
                                              ItemStack stack,
                                              boolean altDown) {
         List<String> affixGroup = collectAffixLines(rawLines);
-        boolean      hasSocket  = hasSocketMarker(rawLines);
+        List<String> attributeGroup = collectBonusAttributeLines(rawLines);
+        List<String> normalizedAttributeGroup = normalizeLines(attributeGroup);
+        List<String> attributeSlotHeaders = collectAttributeSlotHeaderLines(rawLines);
+        boolean hasSocketMarker = hasSocketMarker(rawLines);
+        List<String> socketLines = buildSocketLines(stack, altDown);
 
-        if (affixGroup.isEmpty() && !hasSocket) return model;
+        if (affixGroup.isEmpty() && attributeGroup.isEmpty()
+                && !hasSocketMarker && socketLines.isEmpty()) return model;
 
         // Strip Apotheosis lines from abilityLines so the LORE tab stays clean.
         // (SimplySwordsCompatTooltipProvider can collect affix bullets into abilityLines.)
         List<String> cleanedAbility = new ArrayList<>(model.abilityLines().size());
         for (String line : model.abilityLines()) {
-            if (!isApotheosisLine(line)) cleanedAbility.add(line);
+            if (!isApotheosisLine(line)
+                    && !isSocketMarker(line)
+                    && !containsNormalized(normalizedAttributeGroup, line)
+                    && !isAttributeContextLine(line, attributeSlotHeaders))
+                cleanedAbility.add(line);
         }
+        removeEmptySection(cleanedAbility, "Enchantments");
         trimTrailingBlanks(cleanedAbility);
 
         // Strip Apotheosis lines from bodyLines so the STATS tab stays clean.
         // GenericTooltipProvider places affix bullets into bodyLines (they appear before the
         // blank-line separator), so without this filter they would show on both STATS and AFFIXES.
-        // We also drop APOTH_SOCKET_MARKER which ends up in bodyLines for some items.
+        // We also drop Apotheosis's hidden socket marker, which can land in bodyLines.
         List<String> cleanedBody = new ArrayList<>(model.bodyLines().size());
         for (String line : model.bodyLines()) {
-            if (!isApotheosisLine(line) && !APOTH_SOCKET_MARKER.equals(line))
+            if (!isApotheosisLine(line)
+                    && !isSocketMarker(line)
+                    && !containsNormalized(normalizedAttributeGroup, line)
+                    && !isAttributeContextLine(line, attributeSlotHeaders))
                 cleanedBody.add(line);
         }
+        removeEmptySection(cleanedBody, "Enchantments");
         trimTrailingBlanks(cleanedBody);
 
-        // Strip APOTH_SOCKET_MARKER from extraLines.
+        // Strip Apotheosis's hidden socket marker from extraLines.
         // Apotheosis injects it via AddAttributeTooltipsEvent into the attribute section,
         // which lands in extraLines for attribute-carrying items.
         List<Text> cleanedExtra = new ArrayList<>(model.extraLines().size());
         for (Text t : model.extraLines()) {
-            if (!APOTH_SOCKET_MARKER.equals(t.getString())) cleanedExtra.add(t);
+            String s = t.getString();
+            if (!isSocketMarker(s)
+                    && !containsNormalized(normalizedAttributeGroup, s)
+                    && !isAttributeContextLine(s, attributeSlotHeaders))
+                cleanedExtra.add(t);
         }
 
-        // Build affixLines: affix-bullet section + optional socket section.
+        // Build affixLines: affix-bullet section + optional attribute/socket sections.
         List<String> newAffixLines = new ArrayList<>();
 
         if (!affixGroup.isEmpty()) {
@@ -145,11 +182,13 @@ public final class ApotheosisCompat {
             }
         }
 
-        if (hasSocket) {
-            List<String> socketLines = buildSocketLines(stack, altDown);
-            if (!socketLines.isEmpty()) {
-                newAffixLines.addAll(socketLines);
-            }
+        if (!attributeGroup.isEmpty()) {
+            newAffixLines.add(ModernTooltipModel.SECTION_MARKER + "Attributes");
+            newAffixLines.addAll(attributeGroup);
+        }
+
+        if (!socketLines.isEmpty()) {
+            newAffixLines.addAll(socketLines);
         }
 
         return new ModernTooltipModel(
@@ -164,7 +203,8 @@ public final class ApotheosisCompat {
                 model.animKeyExtra(),
                 model.themeKey(),
                 model.hint(),
-                newAffixLines.isEmpty() ? null : newAffixLines
+                newAffixLines.isEmpty() ? null : newAffixLines,
+                model.itemFrameProgress()
         );
     }
 
@@ -188,73 +228,233 @@ public final class ApotheosisCompat {
         return result;
     }
 
+    /** Collects displayed equipment slot headers such as "When in Main Hand:" from raw lines. */
+    private static List<String> collectAttributeSlotHeaderLines(List<Text> rawLines) {
+        List<String> result = new ArrayList<>();
+        for (int i = 1; i < rawLines.size(); i++) {
+            Text line = rawLines.get(i);
+            if (hasTranslatableKey(line, key -> key.startsWith(SLOT_HEADER_PREFIX))) {
+                result.add(line.getString());
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Collects non-base attribute rows from vanilla equipment modifier blocks.
+     *
+     * <p>Apotheosis appends affix/gem/imbue bonuses into the same slot sections used by vanilla
+     * item attributes. The first attack damage and attack speed rows in a section are usually the
+     * base weapon stats that Simply Tooltips already summarizes elsewhere, so only subsequent
+     * attack rows and all other attributes are mirrored into the AFFIXES tab.
+     */
+    private static List<String> collectBonusAttributeLines(List<Text> rawLines) {
+        List<String> result = new ArrayList<>();
+        boolean inAttributeBlock = false;
+        boolean skippedBaseAttackDamage = false;
+        boolean skippedBaseAttackSpeed = false;
+
+        for (int i = 1; i < rawLines.size(); i++) {
+            Text line = rawLines.get(i);
+            String s = line.getString();
+
+            if (!s.isEmpty() && s.charAt(0) == SECTION_DIAMOND) {
+                inAttributeBlock = false;
+                continue;
+            }
+
+            if (hasTranslatableKey(line, key -> key.startsWith(SLOT_HEADER_PREFIX))) {
+                inAttributeBlock = true;
+                skippedBaseAttackDamage = false;
+                skippedBaseAttackSpeed = false;
+                continue;
+            }
+
+            if (!inAttributeBlock) continue;
+
+            if (s.isBlank()) {
+                inAttributeBlock = false;
+                continue;
+            }
+            if (isSocketMarker(s)) continue;
+
+            if (!isAttributeModifierLine(line)) continue;
+
+            if (isAttackDamageLine(line) && !skippedBaseAttackDamage) {
+                skippedBaseAttackDamage = true;
+                continue;
+            }
+            if (isAttackSpeedLine(line) && !skippedBaseAttackSpeed) {
+                skippedBaseAttackSpeed = true;
+                continue;
+            }
+
+            result.add(s);
+        }
+
+        return result;
+    }
+
     /** Returns {@code true} if rawLines contains the Apotheosis socket marker sentinel. */
     private static boolean hasSocketMarker(List<Text> rawLines) {
         for (int i = 1; i < rawLines.size(); i++) {
-            if (APOTH_SOCKET_MARKER.equals(rawLines.get(i).getString())) return true;
+            if (isSocketMarker(rawLines.get(i).getString())) return true;
         }
         return false;
     }
 
+    private static boolean isSocketMarker(String line) {
+        return APOTH_REMOVE_MARKER.equals(line) || APOTH_SOCKET_MARKER.equals(line);
+    }
+
     /**
-     * Builds the socket summary lines for the AFFIXES tab by reading the item's DataComponents
-     * directly from the Minecraft component-type registry — no compile-time Apotheosis dependency.
+     * Builds optional socket summary lines without a compile-time Apotheosis dependency.
      *
      * <p>When {@code altDown} is {@code true} and a socket is filled, the gem's bullet-prefixed
      * bonus-effect lines (lines starting with U+2022 •) are appended as indented child lines
      * below the gem name.
      *
-     * <p>Returns an empty list if Apotheosis is not loaded or the components are absent.
+     * <p>The 1.20.1 Apotheosis API is preferred because its socket count includes modifications
+     * made through {@code GetItemSocketsEvent}. If that API is unavailable, legacy
+     * {@code affix_data} NBT is read as a safe fallback.
      *
      * @param stack   the host item stack
      * @param altDown whether Alt is held; activates per-gem description expansion
      */
-    @SuppressWarnings("unchecked")
     private static List<String> buildSocketLines(ItemStack stack, boolean altDown) {
-        return List.of();
-    }
-
-    /**
-     * Appends an item-category-specific gem effect line for the given host item.
-     *
-     * <p>This mirrors Apotheosis' own socket tooltip behavior by constructing a
-     * socketed {@code GemInstance} against the host item and reading
-     * {@code SocketTooltipRenderer#getSocketDesc}. This ensures only effects that apply
-     * to the current equipment category are shown (e.g. sword-only on swords).
-     */
-    private static void appendGemDescriptions(List<String> target,
-                                              ItemStack hostStack,
-                                              ItemStack gem,
-                                              int slot) {
-        try {
-            if (appendSocketBonusDescription(target, hostStack, gem, slot)) return;
-        } catch (Exception ignored) {
-            // Reflection failed; leave socket entry without expanded details.
+        SocketSnapshot snapshot = LegacyApotheosisSocketAccess.read(stack, altDown);
+        if (snapshot == null) {
+            snapshot = readLegacySocketNbt(stack);
         }
+        if (snapshot == null || snapshot.totalSockets() <= 0) return List.of();
+
+        List<String> lines = new ArrayList<>();
+        lines.add(ModernTooltipModel.SECTION_MARKER + "Sockets");
+
+        for (int slot = 0; slot < snapshot.totalSockets(); slot++) {
+            SocketEntry entry = slot < snapshot.entries().size()
+                    ? snapshot.entries().get(slot)
+                    : SocketEntry.EMPTY;
+
+            if (entry.gem().isEmpty()) {
+                lines.add(SOCKET_EMPTY + " Empty");
+                continue;
+            }
+
+            lines.add(SOCKET_FILLED + " " + entry.gem().getName().getString());
+            if (altDown) appendSocketDescription(lines, entry.description());
+        }
+
+        return lines;
     }
 
-    private static boolean appendSocketBonusDescription(List<String> target,
-                                                        ItemStack hostStack,
-                                                        ItemStack gem,
-                                                        int slot) throws ReflectiveOperationException {
-        Class<?> gemInstanceClass = Class.forName("dev.shadowsoffire.apotheosis.socket.gem.GemInstance");
-        Class<?> socketTooltipRendererClass = Class.forName("dev.shadowsoffire.apotheosis.client.SocketTooltipRenderer");
-
-        java.lang.reflect.Method socketed = gemInstanceClass.getMethod("socketed", ItemStack.class, ItemStack.class, int.class);
-        Object gemInstance = socketed.invoke(null, hostStack, gem, slot);
-        if (gemInstance == null) return false;
-
-        java.lang.reflect.Method getSocketDesc = socketTooltipRendererClass.getMethod("getSocketDesc", gemInstanceClass);
-        Object descObj = getSocketDesc.invoke(null, gemInstance);
-
-        String desc = componentToString(descObj);
-        if (desc == null) return false;
-        desc = desc.trim();
-        if (desc.isEmpty() || "Invalid Gem Category".equalsIgnoreCase(desc)) return false;
-
+    private static void appendSocketDescription(List<String> target, String description) {
+        if (description == null) return;
+        String desc = description.trim();
+        if (desc.isEmpty() || "Invalid Gem Category".equalsIgnoreCase(desc)) return;
         if (desc.charAt(0) != BULLET) desc = BULLET + " " + desc;
         target.add("  " + desc);
-        return true;
+    }
+
+    private static SocketSnapshot readLegacySocketNbt(ItemStack stack) {
+        NbtCompound affixData = stack.getSubNbt(AFFIX_DATA_NBT);
+        if (affixData == null) return SocketSnapshot.EMPTY;
+
+        int totalSockets = Math.max(0, affixData.getInt(SOCKETS_NBT));
+        if (totalSockets == 0) return SocketSnapshot.EMPTY;
+
+        List<SocketEntry> entries = new ArrayList<>(totalSockets);
+        NbtList gems = affixData.getList(GEMS_NBT, NbtElement.COMPOUND_TYPE);
+        int storedGems = Math.min(totalSockets, gems.size());
+        for (int i = 0; i < storedGems; i++) {
+            ItemStack gem = ItemStack.fromNbt(gems.getCompound(i));
+            entries.add(gem.isEmpty() ? SocketEntry.EMPTY : new SocketEntry(gem, null));
+        }
+        while (entries.size() < totalSockets) entries.add(SocketEntry.EMPTY);
+        return new SocketSnapshot(totalSockets, List.copyOf(entries));
+    }
+
+    /** Lazy reflection bridge for Apotheosis 7.x on Minecraft 1.20.1. */
+    private static final class LegacyApotheosisSocketAccess {
+        private static final Access ACCESS = createAccess();
+
+        private LegacyApotheosisSocketAccess() {}
+
+        private static Access createAccess() {
+            try {
+                Class<?> socketHelper = Class.forName(
+                        "dev.shadowsoffire.apotheosis.adventure.socket.SocketHelper");
+                Class<?> gemInstance = Class.forName(
+                        "dev.shadowsoffire.apotheosis.adventure.socket.gem.GemInstance");
+                return new Access(
+                        socketHelper.getMethod("getSockets", ItemStack.class),
+                        socketHelper.getMethod("getGems", ItemStack.class),
+                        gemInstance.getMethod("isValid"),
+                        gemInstance.getMethod("gemStack"),
+                        gemInstance.getMethod("getSocketBonusTooltip")
+                );
+            } catch (ReflectiveOperationException | LinkageError ignored) {
+                return null;
+            }
+        }
+
+        private static SocketSnapshot read(ItemStack stack, boolean includeDescriptions) {
+            if (ACCESS == null) return null;
+            try {
+                Object socketsObj = ACCESS.getSockets().invoke(null, stack);
+                int totalSockets = socketsObj instanceof Number number
+                        ? Math.max(0, number.intValue())
+                        : 0;
+                if (totalSockets == 0) return SocketSnapshot.EMPTY;
+
+                Object gemsObj = ACCESS.getGems().invoke(null, stack);
+                if (!(gemsObj instanceof List<?> gems)) return null;
+
+                List<SocketEntry> entries = new ArrayList<>(totalSockets);
+                for (int slot = 0; slot < totalSockets; slot++) {
+                    if (slot >= gems.size()) {
+                        entries.add(SocketEntry.EMPTY);
+                        continue;
+                    }
+
+                    Object gemInstance = gems.get(slot);
+                    boolean valid = gemInstance != null
+                            && Boolean.TRUE.equals(ACCESS.isValid().invoke(gemInstance));
+                    if (!valid) {
+                        entries.add(SocketEntry.EMPTY);
+                        continue;
+                    }
+
+                    Object gemObj = ACCESS.gemStack().invoke(gemInstance);
+                    if (!(gemObj instanceof ItemStack gem) || gem.isEmpty()) {
+                        entries.add(SocketEntry.EMPTY);
+                        continue;
+                    }
+
+                    String description = includeDescriptions
+                            ? componentToString(ACCESS.getSocketBonusTooltip().invoke(gemInstance))
+                            : null;
+                    entries.add(new SocketEntry(gem, description));
+                }
+                return new SocketSnapshot(totalSockets, List.copyOf(entries));
+            } catch (ReflectiveOperationException | RuntimeException | LinkageError ignored) {
+                return null;
+            }
+        }
+
+        private record Access(Method getSockets,
+                              Method getGems,
+                              Method isValid,
+                              Method gemStack,
+                              Method getSocketBonusTooltip) {}
+    }
+
+    private record SocketSnapshot(int totalSockets, List<SocketEntry> entries) {
+        private static final SocketSnapshot EMPTY = new SocketSnapshot(0, List.of());
+    }
+
+    private record SocketEntry(ItemStack gem, String description) {
+        private static final SocketEntry EMPTY = new SocketEntry(ItemStack.EMPTY, null);
     }
 
     private static String componentToString(Object value) {
@@ -267,6 +467,109 @@ public final class ApotheosisCompat {
         } catch (Exception ignored) {
             return value.toString();
         }
+    }
+
+    private static boolean isAttributeContextLine(String line, List<String> attributeSlotHeaders) {
+        if (line == null) return false;
+        if (attributeSlotHeaders.contains(line)) return true;
+
+        String s = stripSectionMarker(line).replace('\u00A0', ' ').trim();
+        if (s.isEmpty()) return false;
+        String lower = s.toLowerCase(java.util.Locale.ROOT);
+        return lower.equals("when held:")
+                || (lower.startsWith("when in ") && lower.endsWith(":"));
+    }
+
+    private static List<String> normalizeLines(List<String> lines) {
+        List<String> result = new ArrayList<>(lines.size());
+        for (String line : lines) {
+            result.add(normalizeLine(line));
+        }
+        return result;
+    }
+
+    private static boolean containsNormalized(List<String> normalizedLines, String line) {
+        return normalizedLines.contains(normalizeLine(line));
+    }
+
+    private static String normalizeLine(String line) {
+        return stripSectionMarker(line).replace('\u00A0', ' ').trim();
+    }
+
+    private static void removeEmptySection(List<String> lines, String sectionTitle) {
+        for (int i = 0; i < lines.size(); i++) {
+            String line = lines.get(i);
+            if (!isSection(line, sectionTitle)) continue;
+
+            boolean hasContent = false;
+            for (int j = i + 1; j < lines.size(); j++) {
+                String next = lines.get(j);
+                if (next != null && next.startsWith(ModernTooltipModel.SECTION_MARKER)) break;
+                if (next != null && !next.isBlank()) {
+                    hasContent = true;
+                    break;
+                }
+            }
+
+            if (!hasContent) {
+                lines.remove(i);
+                while (i < lines.size() && lines.get(i).isBlank()) {
+                    lines.remove(i);
+                }
+                i--;
+            }
+        }
+    }
+
+    private static boolean isSection(String line, String sectionTitle) {
+        String s = stripSectionMarker(line).replace('\u00A0', ' ').trim();
+        if (s.startsWith("\u25C6")) s = s.substring(1).trim();
+        return s.equalsIgnoreCase(sectionTitle);
+    }
+
+    private static String stripSectionMarker(String line) {
+        if (line == null) return "";
+        return line.startsWith(ModernTooltipModel.SECTION_MARKER)
+                ? line.substring(ModernTooltipModel.SECTION_MARKER.length())
+                : line;
+    }
+
+    private static boolean isAttributeModifierLine(Text line) {
+        return hasTranslatableKey(line, key -> key.startsWith(ATTRIBUTE_MODIFIER_PREFIX));
+    }
+
+    private static boolean isAttackDamageLine(Text line) {
+        return hasTranslatableKey(line, key -> ATTACK_DAMAGE_KEY.equals(key));
+    }
+
+    private static boolean isAttackSpeedLine(Text line) {
+        return hasTranslatableKey(line, key -> ATTACK_SPEED_KEY.equals(key));
+    }
+
+    private static boolean hasTranslatableKey(Text text, Predicate<String> matcher) {
+        if (text == null) return false;
+        return hasTranslatableKey0(text, matcher, 0);
+    }
+
+    private static boolean hasTranslatableKey0(Text text, Predicate<String> matcher, int depth) {
+        if (depth > 8) return false;
+
+        TextContent content = text.getContent();
+        if (content instanceof TranslatableTextContent translatable) {
+            if (matcher.test(translatable.getKey())) return true;
+            for (Object arg : translatable.getArgs()) {
+                if (arg instanceof Text nested && hasTranslatableKey0(nested, matcher, depth + 1)) {
+                    return true;
+                }
+            }
+        }
+
+        for (Text sibling : text.getSiblings()) {
+            if (hasTranslatableKey0(sibling, matcher, depth + 1)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** Removes trailing blank strings from {@code list} in-place. */

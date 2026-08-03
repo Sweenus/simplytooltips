@@ -6,6 +6,7 @@ import net.minecraftforge.client.event.RegisterKeyMappingsEvent;
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 import net.sweenus.simplytooltips.client.TooltipKeybinds;
 import net.sweenus.simplytooltips.client.TooltipNavigationEvents;
+import net.sweenus.simplytooltips.client.render.BorderDefinitionRegistry;
 import net.sweenus.simplytooltips.client.render.ItemThemeRegistry;
 import net.sweenus.simplytooltips.client.render.ThemeRegistry;
 
@@ -20,6 +21,7 @@ public final class SimplyTooltipsForgeClient {
     public static void onRegisterReloadListeners(final RegisterClientReloadListenersEvent event) {
         event.registerReloadListener((SynchronousResourceReloader) ThemeRegistry::loadAll);
         event.registerReloadListener((SynchronousResourceReloader) ItemThemeRegistry::loadAll);
+        event.registerReloadListener((SynchronousResourceReloader) BorderDefinitionRegistry::loadAll);
     }
 
     public static void onRegisterKeyMappings(final RegisterKeyMappingsEvent event) {
