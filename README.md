@@ -77,6 +77,14 @@ Create `assets/simplytooltips/item_themes/my_mappings.json`.
     "minecraft:netherite_sword": {
       "theme": "my_theme",
       "badges": ["SWORD", "CUSTOM"]
+    },
+    "anothermod:special_item": {
+      "enabled": false
+    }
+  },
+  "namespaces": {
+    "create": {
+      "enabled": false
     }
   },
   "components": [
@@ -104,6 +112,36 @@ Create `assets/simplytooltips/item_themes/my_mappings.json`.
   ]
 }
 ```
+
+Rendering eligibility resolves before themes and providers:
+- An exact item with `"enabled": false` always uses its normal vanilla/modded tooltip.
+- A `namespaces` entry applies to every item whose registry ID starts with that namespace.
+- An exact item `"enabled": true` overrides a disabled namespace, but the normal global
+  settings and mapped-item requirements still decide whether Simply Tooltips applies.
+- If neither rule exists, rendering eligibility defaults to enabled.
+
+For example, this disables Simply Tooltips for all `create:*` items except the wrench:
+
+```json
+{
+  "namespaces": {
+    "create": { "enabled": false }
+  },
+  "items": {
+    "create:wrench": { "enabled": true, "theme": "iron" }
+  }
+}
+```
+
+Use the explicit `enabled` field for exclusions. JSON `null` and the string `"null"` do not
+mean disabled; an absent theme continues through the normal provider/tag/rarity fallback.
+
+Simply Tooltips gathers content through Minecraft's normal loader-aware tooltip pipeline. Text
+added by other mods (including Create descriptions and Ponder prompts) is therefore included, and
+standard non-text tooltip components are embedded below the themed header unless a dedicated
+integration already replaces them. A mod that draws its own tooltip UI after that pipeline may
+still need a dedicated compatibility adapter; it can be excluded with an item or namespace
+`enabled` rule in the meantime.
 
 How it resolves:
 - First matching `components` entry with a theme wins.

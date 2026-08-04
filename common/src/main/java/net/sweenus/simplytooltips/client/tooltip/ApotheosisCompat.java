@@ -57,6 +57,10 @@ public final class ApotheosisCompat {
     /** Sentinel injected by Apotheosis {@code AddAttributeTooltipsEvent} for socket rendering. */
     private static final String APOTH_SOCKET_MARKER = "APOTH_SOCKET_MARKER";
 
+    /** Client tooltip component replaced by the dedicated socket section in the AFFIXES tab. */
+    private static final String SOCKET_TOOLTIP_RENDERER_CLASS =
+            "dev.shadowsoffire.apotheosis.client.SocketTooltipRenderer";
+
     private static final String SLOT_HEADER_PREFIX = "item.modifiers.";
     private static final String ATTRIBUTE_MODIFIER_PREFIX = "attribute.modifier.";
     private static final String ATTACK_DAMAGE_KEY = "attribute.name.generic.attack_damage";
@@ -84,6 +88,22 @@ public final class ApotheosisCompat {
      */
     public static boolean isApotheosisLine(String s) {
         return isAffixLine(s) || isImbueLine(s);
+    }
+
+    /**
+     * Returns whether a gathered native tooltip component duplicates the socket section that
+     * Simply Tooltips successfully added to the model. The class-name check avoids a hard
+     * Apotheosis dependency, while the model check preserves the native renderer as a fallback.
+     */
+    public static boolean shouldSuppressNativeComponent(ModernTooltipModel model, Object component) {
+        if (model == null || component == null
+                || !SOCKET_TOOLTIP_RENDERER_CLASS.equals(component.getClass().getName())) {
+            return false;
+        }
+
+        List<String> affixLines = model.affixLines();
+        return affixLines != null
+                && affixLines.contains(ModernTooltipModel.SECTION_MARKER + "Sockets");
     }
 
     // -------------------------------------------------------------------------
