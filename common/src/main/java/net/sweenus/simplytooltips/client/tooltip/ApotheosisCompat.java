@@ -63,6 +63,10 @@ public final class ApotheosisCompat {
     /** Later Apotheosis versions renamed the sentinel; accepting both is harmless and resilient. */
     private static final String APOTH_SOCKET_MARKER = "APOTH_SOCKET_MARKER";
 
+    /** Apotheosis 7.x client component replaced by the dedicated socket section. */
+    private static final String SOCKET_TOOLTIP_RENDERER_CLASS =
+            "dev.shadowsoffire.apotheosis.adventure.client.SocketTooltipRenderer";
+
     private static final String AFFIX_DATA_NBT = "affix_data";
     private static final String SOCKETS_NBT = "sockets";
     private static final String GEMS_NBT = "gems";
@@ -94,6 +98,22 @@ public final class ApotheosisCompat {
      */
     public static boolean isApotheosisLine(String s) {
         return isAffixLine(s) || isImbueLine(s);
+    }
+
+    /**
+     * Returns whether a gathered native tooltip component duplicates the socket section that
+     * Simply Tooltips successfully added to the model. The class-name check avoids a hard
+     * Apotheosis dependency, while the model check preserves the native renderer as a fallback.
+     */
+    public static boolean shouldSuppressNativeComponent(ModernTooltipModel model, Object component) {
+        if (model == null || component == null
+                || !SOCKET_TOOLTIP_RENDERER_CLASS.equals(component.getClass().getName())) {
+            return false;
+        }
+
+        List<String> affixLines = model.affixLines();
+        return affixLines != null
+                && affixLines.contains(ModernTooltipModel.SECTION_MARKER + "Sockets");
     }
 
     // -------------------------------------------------------------------------

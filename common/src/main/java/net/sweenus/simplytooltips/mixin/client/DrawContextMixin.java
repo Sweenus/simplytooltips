@@ -3,9 +3,11 @@ package net.sweenus.simplytooltips.mixin.client;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.screen.ingame.HandledScreen;
 import net.minecraft.client.gui.screen.ingame.MerchantScreen;
+import net.minecraft.client.gui.tooltip.OrderedTextTooltipComponent;
+import net.minecraft.client.gui.tooltip.TooltipComponent;
+import net.minecraft.client.gui.tooltip.TooltipPositioner;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.registry.Registries;
@@ -40,68 +42,116 @@ public abstract class DrawContextMixin {
     @Unique private static final Map<String, ItemStack> simplytooltips$nameToStackCache = new HashMap<>();
     @Unique private static Map<String, ItemStack> simplytooltips$itemNameLookup = null;
 
+    /** Stack and raw lines associated with the currently executing vanilla tooltip call chain. */
+    @Unique private ItemStack simplytooltips$activeStack = ItemStack.EMPTY;
+    @Unique private List<Text> simplytooltips$activeLines = List.of();
+
     // --- Injection points ---
 
     @Inject(method = "drawItemTooltip(Lnet/minecraft/client/font/TextRenderer;Lnet/minecraft/item/ItemStack;II)V",
-            at = @At("HEAD"), cancellable = true)
-    private void simplytooltips$drawModernTooltip(TextRenderer textRenderer, ItemStack stack,
-                                                  int x, int y, CallbackInfo ci) {
+            at = @At("HEAD"))
+    private void simplytooltips$captureItemTooltipStack(TextRenderer textRenderer, ItemStack stack,
+                                                        int x, int y, CallbackInfo ci) {
         if (stack == null || stack.isEmpty()) return;
+        simplytooltips$lastRealStack = stack;
+        simplytooltips$activeStack = stack;
+    }
+
+    @Inject(method = "drawTooltip(Lnet/minecraft/client/font/TextRenderer;Ljava/util/List;Ljava/util/Optional;II)V",
+            at = @At("HEAD"))
+    private void simplytooltips$captureTooltipLines(TextRenderer textRenderer, List<Text> text,
+                                                    java.util.Optional<?> data,
+                                                    int x, int y, CallbackInfo ci) {
+        simplytooltips$captureLinesAndResolveStack(text);
+    }
+
+    @Inject(method = "drawTooltip(Lnet/minecraft/client/font/TextRenderer;Ljava/util/List;II)V",
+            at = @At("HEAD"), require = 0)
+    private void simplytooltips$captureSimpleTooltipLines(TextRenderer textRenderer, List<Text> text,
+                                                          int x, int y, CallbackInfo ci) {
+        simplytooltips$captureLinesAndResolveStack(text);
+    }
+
+    /** Forge overload that carries an explicit stack. Absent on Fabric. */
+    @Inject(method = "renderTooltip(Lnet/minecraft/client/font/TextRenderer;Ljava/util/List;Ljava/util/Optional;Lnet/minecraft/item/ItemStack;II)V",
+            at = @At("HEAD"), require = 0)
+    private void simplytooltips$captureForgeTooltip(TextRenderer textRenderer, List<Text> text,
+                                                    java.util.Optional<?> data, ItemStack stack,
+                                                    int x, int y, CallbackInfo ci) {
+        if (stack != null && !stack.isEmpty()) {
+            simplytooltips$lastRealStack = stack;
+            simplytooltips$activeStack = stack;
+        }
+        simplytooltips$activeLines = text != null ? text : List.of();
+    }
+
+    /**
+     * Intercept only after vanilla/the loader has converted and gathered tooltip components.
+     * This preserves Fabric TooltipData factories and Forge GatherComponents additions.
+     */
+    @Inject(method = "drawTooltip(Lnet/minecraft/client/font/TextRenderer;Ljava/util/List;IILnet/minecraft/client/gui/tooltip/TooltipPositioner;)V",
+            at = @At("HEAD"), cancellable = true)
+    private void simplytooltips$drawGatheredTooltip(TextRenderer textRenderer,
+                                                    List<TooltipComponent> components,
+                                                    int x, int y, TooltipPositioner positioner,
+                                                    CallbackInfo ci) {
+        if (components == null || components.isEmpty()
+                || simplytooltips$activeLines == null || simplytooltips$activeLines.isEmpty()) {
+            return;
+        }
 
         MinecraftClient client = MinecraftClient.getInstance();
         if (client == null) return;
 
-        simplytooltips$lastRealStack = stack;
-
-        List<Text> raw = Screen.getTooltipFromItem(client, stack);
-        if (raw == null || raw.isEmpty()) return;
+        ItemStack stack = simplytooltips$activeStack;
+        if (stack == null || stack.isEmpty()) {
+            stack = simplytooltips$findRealStack(client, simplytooltips$activeLines.get(0).getString());
+        }
+        if (stack.isEmpty()) return;
 
         Optional<TooltipProvider> provider = TooltipProviderRegistry.find(stack);
-        if (provider.isEmpty()) return;
-        if (!simplytooltips$shouldRenderFor(stack, provider.get())) return;
+        if (provider.isEmpty() || !simplytooltips$shouldRenderFor(stack, provider.get())) return;
+
+        List<TooltipComponent> nativeComponents = components.stream()
+                .filter(component -> !(component instanceof OrderedTextTooltipComponent))
+                .toList();
 
         TooltipRenderer.render(
-                (DrawContext) (Object) this, textRenderer, stack, raw, provider.get(),
-                x, y, client.getWindow().getScaledWidth(), client.getWindow().getScaledHeight());
+                (DrawContext) (Object) this, textRenderer, stack, simplytooltips$activeLines,
+                provider.get(), nativeComponents, x, y,
+                client.getWindow().getScaledWidth(), client.getWindow().getScaledHeight());
+
+        simplytooltips$clearActiveTooltip();
         ci.cancel();
     }
 
-    @Inject(method = "drawTooltip(Lnet/minecraft/client/font/TextRenderer;Ljava/util/List;Ljava/util/Optional;II)V",
-            at = @At("HEAD"), cancellable = true)
-    private void simplytooltips$drawModernTooltipFromLines(TextRenderer textRenderer, List<Text> text,
-                                                           java.util.Optional<?> data,
-                                                           int x, int y, CallbackInfo ci) {
-        simplytooltips$tryRenderFromLines(textRenderer, text, x, y, ci);
-    }
-
-    @Inject(method = "drawTooltip(Lnet/minecraft/client/font/TextRenderer;Ljava/util/List;II)V",
-            at = @At("HEAD"), cancellable = true, require = 0)
-    private void simplytooltips$drawModernTooltipFromSimpleLines(TextRenderer textRenderer, List<Text> text,
-                                                                  int x, int y, CallbackInfo ci) {
-        simplytooltips$tryRenderFromLines(textRenderer, text, x, y, ci);
+    @Inject(method = "drawTooltip(Lnet/minecraft/client/font/TextRenderer;Ljava/util/List;IILnet/minecraft/client/gui/tooltip/TooltipPositioner;)V",
+            at = @At("RETURN"))
+    private void simplytooltips$clearGatheredTooltip(TextRenderer textRenderer,
+                                                     List<TooltipComponent> components,
+                                                     int x, int y, TooltipPositioner positioner,
+                                                     CallbackInfo ci) {
+        simplytooltips$clearActiveTooltip();
     }
 
     // --- Stack-resolution helpers ---
 
     @Unique
-    private void simplytooltips$tryRenderFromLines(TextRenderer textRenderer, List<Text> text,
-                                                   int x, int y, CallbackInfo ci) {
+    private void simplytooltips$captureLinesAndResolveStack(List<Text> text) {
         if (text == null || text.isEmpty()) return;
+        simplytooltips$activeLines = text;
+
+        if (simplytooltips$activeStack != null && !simplytooltips$activeStack.isEmpty()) return;
         MinecraftClient client = MinecraftClient.getInstance();
         if (client == null) return;
 
-        String title = text.get(0).getString();
-        ItemStack resolved = simplytooltips$findRealStack(client, title);
-        if (resolved.isEmpty()) return;
+        simplytooltips$activeStack = simplytooltips$findRealStack(client, text.get(0).getString());
+    }
 
-        Optional<TooltipProvider> provider = TooltipProviderRegistry.find(resolved);
-        if (provider.isEmpty()) return;
-        if (!simplytooltips$shouldRenderFor(resolved, provider.get())) return;
-
-        TooltipRenderer.render(
-                (DrawContext) (Object) this, textRenderer, resolved, text, provider.get(),
-                x, y, client.getWindow().getScaledWidth(), client.getWindow().getScaledHeight());
-        ci.cancel();
+    @Unique
+    private void simplytooltips$clearActiveTooltip() {
+        simplytooltips$activeStack = ItemStack.EMPTY;
+        simplytooltips$activeLines = List.of();
     }
 
     @Unique
@@ -191,6 +241,10 @@ public abstract class DrawContextMixin {
     @Unique
     private static boolean simplytooltips$shouldRenderFor(ItemStack stack, TooltipProvider provider) {
         if (!TooltipNavigationConfig.tooltipRenderingEnabled()) {
+            return false;
+        }
+
+        if (!ItemThemeRegistry.isEnabledForStack(stack)) {
             return false;
         }
 

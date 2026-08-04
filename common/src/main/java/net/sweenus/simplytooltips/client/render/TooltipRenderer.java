@@ -3,6 +3,7 @@ package net.sweenus.simplytooltips.client.render;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.client.gui.tooltip.TooltipComponent;
 import net.minecraft.entity.effect.StatusEffect;
 import net.minecraft.entity.effect.StatusEffectCategory;
 import net.minecraft.item.Item;
@@ -62,6 +63,9 @@ public class TooltipRenderer {
     /** Height consumed by an {@link ModernTooltipModel#AFFIX_DIVIDER} sentinel in the AFFIXES tab. */
     private static final int AFFIX_DIVIDER_H = 7;
 
+    /** Vanilla spacing between stacked non-text tooltip components. */
+    private static final int NATIVE_COMPONENT_GAP = 2;
+
     /**
      * Minimum scale at which the title is rendered before switching to truncation with "...".
      * Below this threshold the text would be unreadably small, so the string is clipped instead.
@@ -105,12 +109,23 @@ public class TooltipRenderer {
      */
     public static void render(DrawContext context, TextRenderer tr, ItemStack stack, List<Text> rawLines,
                               TooltipProvider provider, int x, int y, int screenW, int screenH) {
+        render(context, tr, stack, rawLines, provider, List.of(), x, y, screenW, screenH);
+    }
+
+    /**
+     * Renders a tooltip while embedding non-text components gathered by the vanilla/loader pipeline.
+     */
+    public static void render(DrawContext context, TextRenderer tr, ItemStack stack, List<Text> rawLines,
+                              TooltipProvider provider, List<TooltipComponent> nativeComponents,
+                              int x, int y, int screenW, int screenH) {
 
         context.getMatrices().push();
         context.getMatrices().translate(0.0f, 0.0f, 400.0f);
 
         TooltipExportRenderState.State exportState = TooltipExportRenderState.current();
         boolean exportMode = exportState != null;
+        List<TooltipComponent> gatheredNativeComponents = nativeComponents != null
+                ? nativeComponents : List.of();
 
         boolean altDown = false;
         if (!exportMode) {
@@ -146,7 +161,8 @@ public class TooltipRenderer {
         if (mbc != null
                 && ItemStack.areEqual(mbc.stack, stack)
                 && mbc.altDown == altDown
-                && mbc.maxW    == currMaxW) {
+                && mbc.maxW    == currMaxW
+                && mbc.rawLines.equals(rawLines)) {
             // Cache hit — reuse everything from the previous frame.
             model             = mbc.model;
             resolvedDef       = mbc.resolvedDef;
@@ -226,7 +242,7 @@ public class TooltipRenderer {
                     : List.of();
 
             modelBuildCache = new ModelBuildCache(
-                    stack, altDown, currMaxW,
+                    stack, List.copyOf(rawLines), altDown, currMaxW,
                     model, resolvedDef, borderDef, resolvedMotifKey,
                     itemAnimStyle, titleAnimStyle, itemBorderShape,
                     badges, abilitySection,
@@ -234,6 +250,10 @@ public class TooltipRenderer {
                     wrappedAffixes, wrappedExtra, wrappedRuneEffect,
                     bodyStats, extraStats, statValueColumnW);
         }
+
+        List<TooltipComponent> visibleNativeComponents = gatheredNativeComponents.stream()
+                .filter(component -> !ApotheosisCompat.shouldSuppressNativeComponent(model, component))
+                .toList();
 
         final TooltipTheme theme = resolvedDef.colors();
         long tooltipElapsedMs = exportMode
@@ -294,13 +314,25 @@ public class TooltipRenderer {
         );
         // wrappedRuneEffect is now built and cached in the ModelBuildCache block above.
         boolean hasAffixes    = !wrappedAffixes.isEmpty();
-        boolean hasBodyContent = (hasAbility && drawLore)
+        boolean hasModelBodyContent = (hasAbility && drawLore)
                 || (hasCustom && drawLore)
                 || drawUpgradeSummary
                 || drawUpgradeRuneDetails
                 || drawUpgradeFull
                 || ((hasBody || hasExtra) && drawStats)
                 || (hasAffixes && drawAffixes);
+        boolean hasNativeComponents = !visibleNativeComponents.isEmpty();
+        boolean nativeNeedsSeparator = hasNativeComponents && hasModelBodyContent;
+        boolean hasBodyContent = hasNativeComponents || hasModelBodyContent;
+
+        int nativeComponentW = 0;
+        int nativeComponentH = 0;
+        for (int i = 0; i < visibleNativeComponents.size(); i++) {
+            TooltipComponent component = visibleNativeComponents.get(i);
+            nativeComponentW = Math.max(nativeComponentW, Math.max(0, component.getWidth(tr)));
+            nativeComponentH += Math.max(0, component.getHeight());
+            if (i + 1 < visibleNativeComponents.size()) nativeComponentH += NATIVE_COMPONENT_GAP;
+        }
 
         // Panel width
         int textContentW = 0;
@@ -386,11 +418,20 @@ public class TooltipRenderer {
             textContentW = Math.max(textContentW, iconAreaW + tr.getWidth(model.hint().getString()) + 4);
         }
 
+        if (hasNativeComponents) {
+            int screenSafeContentW = Math.max(1, screenW - padding() * 2 - 12);
+            textContentW = Math.max(textContentW, Math.min(nativeComponentW, screenSafeContentW));
+        }
+
         textContentW = Math.max(textContentW, 150);
         int panelW   = padding() + textContentW + padding();
 
         // Panel height — each section is gated by its draw-tab boolean
         int bodyH = 0;
+        if (hasNativeComponents) {
+            bodyH += nativeComponentH;
+            if (nativeNeedsSeparator) bodyH += separatorH;
+        }
         if (hasAbility && drawLore) {
             bodyH += lineHeight + sectionGap; // "◆ Description" header
             boolean sawAbilityContent = false;
@@ -640,6 +681,32 @@ public class TooltipRenderer {
             ScrollState.flushScrollDelta(scrollMax);
             context.enableScissor(panelX, bodyClipTop, panelX + panelW, bodyClipBottom);
             cursorY -= ScrollState.get();
+        }
+
+        // ---- Standard non-text tooltip components (bundle grids, mod widgets, etc.) ----
+        if (hasNativeComponents) {
+            int componentX = panelX + padding();
+            int componentY = cursorY;
+
+            // Match vanilla's two-pass ordering so component text is submitted before item rendering.
+            for (TooltipComponent component : visibleNativeComponents) {
+                component.drawText(tr, componentX, componentY,
+                        context.getMatrices().peek().getPositionMatrix(), context.getVertexConsumers());
+                componentY += Math.max(0, component.getHeight()) + NATIVE_COMPONENT_GAP;
+            }
+
+            componentY = cursorY;
+            for (TooltipComponent component : visibleNativeComponents) {
+                component.drawItems(tr, componentX, componentY, context);
+                componentY += Math.max(0, component.getHeight()) + NATIVE_COMPONENT_GAP;
+            }
+
+            cursorY += nativeComponentH;
+            if (nativeNeedsSeparator) {
+                TooltipPainter.drawSeparator(context, panelX + padding(), cursorY,
+                        panelW - padding() * 2, theme);
+                cursorY += separatorH;
+            }
         }
 
         // ---- Ability / Description section ----
@@ -1666,6 +1733,7 @@ public class TooltipRenderer {
     private static final class ModelBuildCache {
         // --- Key fields (checked before using cached data) ---
         final ItemStack stack;
+        final List<Text> rawLines;
         final boolean   altDown;
         final int       maxW;
 
@@ -1690,7 +1758,7 @@ public class TooltipRenderer {
         final List<InlineStatRow> extraStats;
         final int                 statValueColumnW;
 
-        ModelBuildCache(ItemStack stack, boolean altDown, int maxW,
+        ModelBuildCache(ItemStack stack, List<Text> rawLines, boolean altDown, int maxW,
                         ModernTooltipModel model, ThemeDefinition resolvedDef,
                         BorderDefinition borderDef, String resolvedMotifKey,
                         String itemAnimStyle, String titleAnimStyle, String itemBorderShape,
@@ -1701,6 +1769,7 @@ public class TooltipRenderer {
                         List<InlineStatRow> bodyStats, List<InlineStatRow> extraStats,
                         int statValueColumnW) {
             this.stack            = stack;
+            this.rawLines         = rawLines;
             this.altDown          = altDown;
             this.maxW             = maxW;
             this.model            = model;

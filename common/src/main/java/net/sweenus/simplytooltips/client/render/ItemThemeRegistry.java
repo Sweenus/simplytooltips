@@ -21,7 +21,7 @@ import java.io.InputStreamReader;
 import java.util.*;
 
 /**
- * Maps item IDs and item tags to theme keys and/or badge label lists, loaded from
+ * Maps item IDs and item tags to rendering eligibility, theme keys and/or badge label lists, loaded from
  * {@code assets/simplytooltips/item_themes/<name>.json}.
  *
  * <p>Multiple files are supported: {@code items} entries are merged (later files win),
@@ -30,13 +30,17 @@ import java.util.*;
  *
  * <h3>JSON format</h3>
  * Item values may be a plain theme-key string <em>or</em> an object with optional
- * {@code theme}, {@code border} and {@code badges} fields. The three are independent axes — an entry
+ * {@code enabled}, {@code theme}, {@code border} and {@code badges} fields. These are independent axes — an entry
  * may set only a border, leaving the theme to be resolved as usual:
  * <pre>{@code
  * {
  *   "items": {
  *     "minecraft:iron_sword": "lightning",
- *     "minecraft:netherite_sword": { "theme": "lightning", "badges": ["SWORD", "NETHERITE"] }
+ *     "minecraft:netherite_sword": { "theme": "lightning", "badges": ["SWORD", "NETHERITE"] },
+ *     "examplemod:unmodified_item": { "enabled": false }
+ *   },
+ *   "namespaces": {
+ *     "create": { "enabled": false }
  *   },
  *   "components": [
  *     { "component": "mod:rarity=mod:rare", "border": "rarity_rare", "badges": ["RARE"] },
@@ -62,6 +66,10 @@ public final class ItemThemeRegistry {
     private static final Map<Identifier, List<String>> ITEM_BADGES = new HashMap<>();
     /** Exact item-ID → border key (may be present without a theme entry). */
     private static final Map<Identifier, String>       ITEM_BORDERS = new HashMap<>();
+    /** Exact item-ID → rendering eligibility. */
+    private static final Map<Identifier, Boolean>      ITEM_ENABLED = new HashMap<>();
+    /** Item registry namespace → rendering eligibility. */
+    private static final Map<String, Boolean>          NAMESPACE_ENABLED = new HashMap<>();
 
     /** Ordered component → (value?, theme key?, border key?, badge list?) entries. First match wins. */
     private static final List<ComponentEntry> COMPONENT_ENTRIES = new ArrayList<>();
@@ -91,6 +99,21 @@ public final class ItemThemeRegistry {
         return resolveComponentThemeForStack(stack) != null
                 || resolveItemThemeForStack(stack) != null
                 || resolveTagThemeForStack(stack) != null;
+    }
+
+    /**
+     * Returns whether Simply Tooltips is allowed to render this stack according to data rules.
+     * Exact item rules override namespace rules; absent rules default to enabled.
+     */
+    public static boolean isEnabledForStack(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) return true;
+
+        Identifier id = Registries.ITEM.getId(stack.getItem());
+        Boolean itemEnabled = ITEM_ENABLED.get(id);
+        if (itemEnabled != null) return itemEnabled;
+
+        Boolean namespaceEnabled = NAMESPACE_ENABLED.get(id.getNamespace());
+        return namespaceEnabled == null || namespaceEnabled;
     }
 
     /** Returns only the first matching component theme, or {@code null}. */
@@ -202,6 +225,8 @@ public final class ItemThemeRegistry {
         ITEM_THEMES.clear();
         ITEM_BADGES.clear();
         ITEM_BORDERS.clear();
+        ITEM_ENABLED.clear();
+        NAMESPACE_ENABLED.clear();
         COMPONENT_ENTRIES.clear();
         TAG_ENTRIES.clear();
 
@@ -217,7 +242,7 @@ public final class ItemThemeRegistry {
 
                 // --- "items" section ---
                 // Each value is either a plain theme-key string or an object:
-                //   { "theme": "optional_key", "border": "optional_key", "badges": ["A", "B"] }
+                //   { "enabled": false, "theme": "optional_key", "border": "optional_key", "badges": ["A", "B"] }
                 if (json.has("items") && json.get("items").isJsonObject()) {
                     for (Map.Entry<String, JsonElement> itemEntry
                             : json.getAsJsonObject("items").entrySet()) {
@@ -228,12 +253,12 @@ public final class ItemThemeRegistry {
                         JsonElement val = itemEntry.getValue();
                         if (val.isJsonPrimitive()) {
                             // Plain string → theme key only
-                            ITEM_THEMES.put(itemId, val.getAsString());
+                            String themeKey = readString(val);
+                            if (themeKey != null) ITEM_THEMES.put(itemId, themeKey);
                         } else if (val.isJsonObject()) {
                             JsonObject obj = val.getAsJsonObject();
-                            if (obj.has("theme")) {
-                                ITEM_THEMES.put(itemId, obj.get("theme").getAsString());
-                            }
+                            String themeKey = readString(obj.get("theme"));
+                            if (themeKey != null) ITEM_THEMES.put(itemId, themeKey);
                             String itemBorder = parseBorderKey(obj);
                             if (itemBorder != null) {
                                 ITEM_BORDERS.put(itemId, itemBorder);
@@ -242,7 +267,24 @@ public final class ItemThemeRegistry {
                             if (badges != null) {
                                 ITEM_BADGES.put(itemId, badges);
                             }
+                            Boolean enabled = readBoolean(obj.get("enabled"));
+                            if (enabled != null) ITEM_ENABLED.put(itemId, enabled);
                         }
+                    }
+                }
+
+                // --- "namespaces" section ---
+                // Each value is an object: { "enabled": false }.
+                // Exact item eligibility overrides a namespace rule.
+                if (json.has("namespaces") && json.get("namespaces").isJsonObject()) {
+                    for (Map.Entry<String, JsonElement> namespaceEntry
+                            : json.getAsJsonObject("namespaces").entrySet()) {
+                        String namespace = namespaceEntry.getKey();
+                        JsonElement val = namespaceEntry.getValue();
+                        if (!isValidNamespace(namespace) || !val.isJsonObject()) continue;
+
+                        Boolean enabled = readBoolean(val.getAsJsonObject().get("enabled"));
+                        if (enabled != null) NAMESPACE_ENABLED.put(namespace, enabled);
                     }
                 }
 
@@ -269,13 +311,13 @@ public final class ItemThemeRegistry {
                     for (JsonElement el : json.getAsJsonArray("tags")) {
                         if (!el.isJsonObject()) continue;
                         JsonObject tagObj = el.getAsJsonObject();
-                        if (!tagObj.has("tag")) continue;
+                        String tagText = readString(tagObj.get("tag"));
+                        if (tagText == null) continue;
 
-                        Identifier tagId = Identifier.tryParse(tagObj.get("tag").getAsString());
+                        Identifier tagId = Identifier.tryParse(tagText);
                         if (tagId == null) continue;
 
-                        String themeKey = tagObj.has("theme")
-                                ? tagObj.get("theme").getAsString() : null;
+                        String themeKey = readString(tagObj.get("theme"));
                         String borderKey = parseBorderKey(tagObj);
                         List<String> badges = parseBadgeArray(tagObj);
 
@@ -292,8 +334,9 @@ public final class ItemThemeRegistry {
             }
         }
 
-        SimplyTooltips.LOGGER.info("[SimplyTooltips] Loaded {} item theme(s), {} item badge override(s), {} item border override(s), {} component entries, {} tag entries",
+        SimplyTooltips.LOGGER.info("[SimplyTooltips] Loaded {} item theme(s), {} item badge override(s), {} item border override(s), {} item eligibility rule(s), {} namespace eligibility rule(s), {} component entries, {} tag entries",
                 ITEM_THEMES.size(), ITEM_BADGES.size(), ITEM_BORDERS.size(),
+                ITEM_ENABLED.size(), NAMESPACE_ENABLED.size(),
                 COMPONENT_ENTRIES.size(), TAG_ENTRIES.size());
     }
 
@@ -307,9 +350,8 @@ public final class ItemThemeRegistry {
      * when neither is present.
      */
     private static @Nullable String parseBorderKey(JsonObject obj) {
-        if (obj.has("border")) return obj.get("border").getAsString();
-        if (obj.has("borderStyle")) return obj.get("borderStyle").getAsString();
-        return null;
+        String border = readString(obj.get("border"));
+        return border != null ? border : readString(obj.get("borderStyle"));
     }
 
     /** Reads the {@code "badges"} string array from a JSON object, or returns {@code null}. */
@@ -324,10 +366,10 @@ public final class ItemThemeRegistry {
     }
 
     private static @Nullable ComponentEntry parseComponentEntry(JsonObject obj) {
-        if (!obj.has("component")) return null;
+        String componentText = readString(obj.get("component"));
+        if (componentText == null) return null;
 
-        String componentText = obj.get("component").getAsString();
-        String valueText = obj.has("value") ? obj.get("value").getAsString() : null;
+        String valueText = readString(obj.get("value"));
 
         int shorthandSeparator = componentText.indexOf('=');
         if (shorthandSeparator >= 0) {
@@ -338,12 +380,32 @@ public final class ItemThemeRegistry {
         Identifier componentId = Identifier.tryParse(componentText);
         if (componentId == null) return null;
 
-        String themeKey = obj.has("theme") ? obj.get("theme").getAsString() : null;
+        String themeKey = readString(obj.get("theme"));
         String borderKey = parseBorderKey(obj);
         List<String> badges = parseBadgeArray(obj);
 
         if (themeKey == null && borderKey == null && badges == null) return null;
         return new ComponentEntry(componentId, valueText, themeKey, borderKey, badges);
+    }
+
+    private static @Nullable String readString(@Nullable JsonElement element) {
+        if (element == null || element.isJsonNull() || !element.isJsonPrimitive()) return null;
+        return element.getAsJsonPrimitive().isString() ? element.getAsString() : null;
+    }
+
+    private static @Nullable Boolean readBoolean(@Nullable JsonElement element) {
+        if (element == null || element.isJsonNull() || !element.isJsonPrimitive()) return null;
+        return element.getAsJsonPrimitive().isBoolean() ? element.getAsBoolean() : null;
+    }
+
+    private static boolean isValidNamespace(String namespace) {
+        if (namespace == null || namespace.isEmpty()) return false;
+        for (int i = 0; i < namespace.length(); i++) {
+            char c = namespace.charAt(i);
+            if ((c < 'a' || c > 'z') && (c < '0' || c > '9')
+                    && c != '_' && c != '-' && c != '.') return false;
+        }
+        return true;
     }
 
     private static boolean componentEntryMatches(ItemStack stack, ComponentEntry entry) {
