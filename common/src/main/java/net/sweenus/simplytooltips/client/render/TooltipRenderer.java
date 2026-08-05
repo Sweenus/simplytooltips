@@ -22,6 +22,7 @@ import net.sweenus.simplytooltips.client.TooltipKeybinds;
 import net.sweenus.simplytooltips.client.TooltipNavigationConfig;
 import net.sweenus.simplytooltips.client.render.motif.BackgroundMotif;
 import net.sweenus.simplytooltips.client.tooltip.ApotheosisCompat;
+import net.sweenus.simplytooltips.client.tooltip.NativeComponentFilter;
 import net.sweenus.simplytooltips.client.tooltip.SimplySwordsCompatTooltipProvider;
 import net.sweenus.simplytooltips.config.SimplyTooltipsConfig;
 
@@ -251,6 +252,7 @@ public class TooltipRenderer {
         }
 
         List<TooltipComponent> visibleNativeComponents = gatheredNativeComponents.stream()
+                .filter(component -> !NativeComponentFilter.isBlocked(component))
                 .filter(component -> !ApotheosisCompat.shouldSuppressNativeComponent(model, component))
                 .toList();
 

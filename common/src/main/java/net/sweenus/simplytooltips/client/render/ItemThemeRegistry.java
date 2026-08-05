@@ -15,6 +15,7 @@ import net.minecraft.registry.tag.TagKey;
 import net.minecraft.resource.ResourceManager;
 import net.minecraft.util.Identifier;
 import net.sweenus.simplytooltips.SimplyTooltips;
+import net.sweenus.simplytooltips.client.tooltip.NativeComponentFilter;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.InputStreamReader;
@@ -42,6 +43,10 @@ import java.util.*;
  *   },
  *   "namespaces": {
  *     "create": { "enabled": false }
+ *   },
+ *   "tooltip_components": {
+ *     "com.example.tooltip.WidgetComponent": { "enabled": false },
+ *     "com.example.tooltip.*":               { "enabled": false }
  *   },
  *   "components": [
  *     { "component": "mod:rarity=mod:rare", "border": "rarity_rare", "badges": ["RARE"] },
@@ -71,6 +76,8 @@ public final class ItemThemeRegistry {
     private static final Map<Identifier, Boolean>      ITEM_ENABLED = new HashMap<>();
     /** Item registry namespace → rendering eligibility. */
     private static final Map<String, Boolean>           NAMESPACE_ENABLED = new HashMap<>();
+    /** Native tooltip component class-name pattern → rendering eligibility. */
+    private static final Map<String, Boolean>           TOOLTIP_COMPONENT_ENABLED = new HashMap<>();
 
     /** Ordered component → (value?, theme key?, border key?, badge list?) entries. First match wins. */
     private static final List<ComponentEntry> COMPONENT_ENTRIES = new ArrayList<>();
@@ -228,6 +235,7 @@ public final class ItemThemeRegistry {
         ITEM_BORDERS.clear();
         ITEM_ENABLED.clear();
         NAMESPACE_ENABLED.clear();
+        TOOLTIP_COMPONENT_ENABLED.clear();
         COMPONENT_ENTRIES.clear();
         TAG_ENTRIES.clear();
 
@@ -289,6 +297,23 @@ public final class ItemThemeRegistry {
                     }
                 }
 
+                // --- "tooltip_components" section ---
+                // Blacklist for native tooltip components other mods contribute, keyed by
+                // implementation class name (exact, or a package prefix ending in '.' or '*'):
+                //   { "com.example.tooltip.*": { "enabled": false } }
+                // Distinct from the "components" array below, which matches item DataComponents.
+                if (json.has("tooltip_components") && json.get("tooltip_components").isJsonObject()) {
+                    for (Map.Entry<String, JsonElement> componentEntry
+                            : json.getAsJsonObject("tooltip_components").entrySet()) {
+                        String pattern = componentEntry.getKey();
+                        JsonElement val = componentEntry.getValue();
+                        if (!isValidClassPattern(pattern) || !val.isJsonObject()) continue;
+
+                        Boolean enabled = readBoolean(val.getAsJsonObject().get("enabled"));
+                        if (enabled != null) TOOLTIP_COMPONENT_ENABLED.put(pattern, enabled);
+                    }
+                }
+
                 // --- "components" section ---
                 // Each entry:
                 //   { "component": "ns:id", "value": "optional_value", "theme": "optional_key",
@@ -335,9 +360,11 @@ public final class ItemThemeRegistry {
             }
         }
 
-        SimplyTooltips.LOGGER.info("[SimplyTooltips] Loaded {} item theme(s), {} item badge override(s), {} item border override(s), {} item eligibility rule(s), {} namespace eligibility rule(s), {} component entries, {} tag entries",
+        NativeComponentFilter.setRules(TOOLTIP_COMPONENT_ENABLED);
+
+        SimplyTooltips.LOGGER.info("[SimplyTooltips] Loaded {} item theme(s), {} item badge override(s), {} item border override(s), {} item eligibility rule(s), {} namespace eligibility rule(s), {} tooltip component rule(s), {} component entries, {} tag entries",
                 ITEM_THEMES.size(), ITEM_BADGES.size(), ITEM_BORDERS.size(),
-                ITEM_ENABLED.size(), NAMESPACE_ENABLED.size(),
+                ITEM_ENABLED.size(), NAMESPACE_ENABLED.size(), TOOLTIP_COMPONENT_ENABLED.size(),
                 COMPONENT_ENTRIES.size(), TAG_ENTRIES.size());
     }
 
@@ -405,6 +432,22 @@ public final class ItemThemeRegistry {
             char c = namespace.charAt(i);
             if ((c < 'a' || c > 'z') && (c < '0' || c > '9')
                     && c != '_' && c != '-' && c != '.') return false;
+        }
+        return true;
+    }
+
+    /**
+     * Validates a {@code tooltip_components} key: a Java class name, optionally ending in
+     * {@code *} to match a package prefix. Rejects anything that could never name a class so a
+     * typo is dropped at load time rather than silently never matching.
+     */
+    private static boolean isValidClassPattern(String pattern) {
+        if (pattern == null || pattern.isEmpty()) return false;
+        String body = pattern.endsWith("*") ? pattern.substring(0, pattern.length() - 1) : pattern;
+        if (body.isEmpty()) return false;
+        for (int i = 0; i < body.length(); i++) {
+            char c = body.charAt(i);
+            if (!Character.isLetterOrDigit(c) && c != '.' && c != '_' && c != '$') return false;
         }
         return true;
     }

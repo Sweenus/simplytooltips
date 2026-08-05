@@ -143,6 +143,39 @@ integration already replaces them. A mod that draws its own tooltip UI after tha
 still need a dedicated compatibility adapter; it can be excluded with an item or namespace
 `enabled` rule in the meantime.
 
+### Blacklisting tooltip components
+
+Some mods contribute *decoration* components rather than content — chrome that is redundant once
+Simply Tooltips draws its own panel. `tooltip_components` blacklists those by implementation
+class name, either exactly or as a package prefix ending in `.` or `*`:
+
+```json
+{
+  "tooltip_components": {
+    "com.example.tooltip.WidgetComponent": { "enabled": false },
+    "com.example.tooltip.*": { "enabled": false }
+  }
+}
+```
+
+Note this is unrelated to the `components` array above, which matches item data components.
+
+Legendary Tooltips is blacklisted out of the box: it inserts a framed, rotating item render at
+the top of every tooltip, which duplicates the item icon Simply Tooltips already draws in its
+header. To get it back, re-enable the rule:
+
+```json
+{
+  "tooltip_components": {
+    "com.anthonyhilyard.legendarytooltips.tooltip.*": { "enabled": true }
+  }
+}
+```
+
+Rules resolve per component class: an exact match wins, then the longest matching prefix, then
+the built-in defaults. A rule on a base class also covers subclasses. As with the other
+sections, only an explicit `enabled` field counts — an absent one is not a blacklist.
+
 How it resolves:
 - First matching `components` entry with a theme wins.
 - If no component theme matches, exact item matches in `items` win.
