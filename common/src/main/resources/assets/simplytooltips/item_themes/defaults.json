@@ -107,6 +107,7 @@
     "simplyswords:wraithfang":           { "theme": "echo",      "badges": ["UNIQUE", "CUTLASS"]    },
     "simplyswords:chompolotl":           { "theme": "bubble",    "badges": ["UNIQUE", "CHAKRAM"]    },
     "simplyswords:dreadtide":            { "theme": "bubble",    "badges": ["UNIQUE", "TWINBLADE"]  },
+    "simplyswords:stormscale":           { "theme": "lightning", "badges": ["UNIQUE", "GLAIVE"]     },
 
     "simplyswords:contained_remnant":     { "theme": "autumn",         "badges": ["UPGRADE"] },
     "simplyswords:tampered_remnant":      { "theme": "obfuscated",     "badges": ["UPGRADE"] },
