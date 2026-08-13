@@ -30,6 +30,7 @@ public class MotifRegistry {
         MOTIFS.put("soul",      new SoulMotif());
         MOTIFS.put("deepdark",  new DeepDarkMotif());
         MOTIFS.put("poison",    new PoisonMotif());
+        MOTIFS.put("blood",     new BloodMotif());
         MOTIFS.put("ocean",     new OceanMotif());
         MOTIFS.put("rustic",    new RusticMotif());
         MOTIFS.put("honey",     new HoneyMotif());

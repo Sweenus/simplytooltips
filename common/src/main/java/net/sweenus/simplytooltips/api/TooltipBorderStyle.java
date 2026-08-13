@@ -36,6 +36,7 @@ public final class TooltipBorderStyle {
     public static final int DIAMOND = 23;
     public static final int NETHERITE = 24;
     public static final int RUNIC = 25;
+    public static final int BLOOD = 26;
 
     /** Maps a legacy constant to its border pattern key; unknown values map to {@code "none"}. */
     public static String keyOf(int borderStyle) {
@@ -65,6 +66,7 @@ public final class TooltipBorderStyle {
             case DIAMOND   -> "diamond";
             case NETHERITE -> "netherite";
             case RUNIC     -> "runic";
+            case BLOOD     -> "blood";
             default        -> "none";
         };
     }

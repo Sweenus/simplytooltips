@@ -33,6 +33,7 @@ public class BorderRegistry {
         PATTERNS.put("soul",      new SoulBorder());
         PATTERNS.put("deepdark",  new DeepDarkBorder());
         PATTERNS.put("poison",    new PoisonBorder());
+        PATTERNS.put("blood",     new BloodBorder());
         PATTERNS.put("ocean",     new OceanBorder());
         PATTERNS.put("rustic",    new RusticBorder());
         PATTERNS.put("jade",      new JadeBorder());
