@@ -42,6 +42,7 @@ public class MotifRegistry {
         MOTIFS.put("diamond",   new DiamondMotif());
         MOTIFS.put("netherite", new NetheriteMotif());
         MOTIFS.put("runic",     new RunicMotif());
+        MOTIFS.put("corrupted_eye", new CorruptedEyeMotif());
     }
 
     /**
