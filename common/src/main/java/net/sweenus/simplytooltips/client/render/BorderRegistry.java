@@ -44,6 +44,7 @@ public class BorderRegistry {
         PATTERNS.put("diamond",   new DiamondBorder());
         PATTERNS.put("netherite", new NetheriteBorder());
         PATTERNS.put("runic",     new RunicBorder());
+        PATTERNS.put("corrupted_eye", new CorruptedEyeBorder());
     }
 
     /**

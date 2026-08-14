@@ -105,6 +105,8 @@
     "simplyswords:enigma":               { "theme": "jade",      "badges": ["UNIQUE", "CLAYMORE"]   },
     "simplyswords:caelestis":            { "theme": "cosmic",    "badges": ["UNIQUE", "CLAYMORE"]   },
     "simplyswords:wraithfang":           { "theme": "echo",      "badges": ["UNIQUE", "CUTLASS"]    },
+    "simplyswords:the_devourer":         { "theme": "corrupted_eye", "badges": ["UNIQUE", "CLAYMORE"]},
+    "simplyswords:wraithmaw":            { "theme": "corrupted_eye", "badges": ["UNIQUE", "CUTLASS"]},
     "simplyswords:chompolotl":           { "theme": "bubble",    "badges": ["UNIQUE", "CHAKRAM"]    },
     "simplyswords:dreadtide":            { "theme": "bubble",    "badges": ["UNIQUE", "TWINBLADE"]  },
     "simplyswords:stormscale":           { "theme": "lightning", "badges": ["UNIQUE", "GLAIVE"]     },
