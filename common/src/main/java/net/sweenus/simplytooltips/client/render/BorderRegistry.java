@@ -46,6 +46,8 @@ public class BorderRegistry {
         PATTERNS.put("runic",     new RunicBorder());
         PATTERNS.put("corrupted_eye", new CorruptedEyeBorder());
         PATTERNS.put("spectral",  new SpectralBorder());
+        PATTERNS.put("radiant",   new RadiantBorder());
+        PATTERNS.put("candle",    new CandleBorder());
     }
 
     /**

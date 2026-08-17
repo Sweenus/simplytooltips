@@ -44,6 +44,8 @@ public class MotifRegistry {
         MOTIFS.put("runic",     new RunicMotif());
         MOTIFS.put("corrupted_eye", new CorruptedEyeMotif());
         MOTIFS.put("spectral",  new SpectralMotif());
+        MOTIFS.put("radiant",   new RadiantMotif());
+        MOTIFS.put("candle",    new CandleMotif());
     }
 
     /**

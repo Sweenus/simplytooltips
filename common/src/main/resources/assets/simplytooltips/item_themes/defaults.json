@@ -90,11 +90,11 @@
     "simplyswords:harbinger":            { "theme": "echo",      "badges": ["UNIQUE", "LONGSWORD"]  },
     "simplyswords:whisperwind":          { "theme": "blossom",   "badges": ["UNIQUE", "KATANA"]     },
     "simplyswords:emberlash":            { "theme": "ember",     "badges": ["UNIQUE", "DAGGER"]     },
-    "simplyswords:waxweaver":            { "theme": "honey",     "badges": ["UNIQUE", "GREATSWORD"] },
+    "simplyswords:waxweaver":            { "theme": "candle",    "badges": ["UNIQUE", "GREATSWORD"] },
     "simplyswords:hiveheart":            { "theme": "honey",     "badges": ["UNIQUE", "GREATHAMMER"]},
     "simplyswords:stars_edge":           { "theme": "cosmic",    "badges": ["UNIQUE", "TWINBLADE"]  },
     "simplyswords:sword_on_a_stick":     { "theme": "unstable",  "badges": ["VERY UNIQUE", "SPEAR"] },
-    "simplyswords:wickpiercer":          { "theme": "honey",     "badges": ["UNIQUE", "SPEAR"]      },
+    "simplyswords:wickpiercer":          { "theme": "candle",    "badges": ["UNIQUE", "SPEAR"]      },
     "simplyswords:tempest":              { "theme": "lightning", "badges": ["UNIQUE", "CHAKRAM"]    },
     "simplyswords:flamewind":            { "theme": "earth",     "badges": ["UNIQUE", "GLAIVE"]     },
     "simplyswords:ribboncleaver":        { "theme": "autumn",    "badges": ["UNIQUE", "CLAYMORE"]   },
@@ -117,6 +117,8 @@
     "simplyswords:gloampiercer":         { "theme": "corrupted_eye", "badges": ["UNIQUE", "SPEAR"]    },
 
     "simplyswords:riftmane":             { "theme": "spectral",  "badges": ["UNIQUE", "CLAYMORE"]   },
+
+    "simplyswords:dawnquiver":           { "theme": "radiant",   "badges": ["UNIQUE", "CLAYMORE"]   },
 
     "simplyswords:contained_remnant":     { "theme": "autumn",         "badges": ["UPGRADE"] },
     "simplyswords:tampered_remnant":      { "theme": "obfuscated",     "badges": ["UPGRADE"] },
