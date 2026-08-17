@@ -288,7 +288,7 @@ These are the built-in values you can reuse in your own theme JSON.
 ### `motif`
 
 - `none`
-- `vine`, `ember`, `enchanted`, `bee`, `blossom`, `bubble`, `earth`, `echo`, `cosmic`, `ice`, `lightning`, `autumn`, `soul`, `deepdark`, `poison`, `blood`, `ocean`, `rustic`, `honey`, `jade`, `wood`, `stone`, `iron`, `gold`, `diamond`, `netherite`, `runic`, `corrupted_eye`, `spectral`
+- `vine`, `ember`, `enchanted`, `bee`, `blossom`, `bubble`, `earth`, `echo`, `cosmic`, `ice`, `lightning`, `autumn`, `soul`, `deepdark`, `poison`, `blood`, `ocean`, `rustic`, `honey`, `jade`, `wood`, `stone`, `iron`, `gold`, `diamond`, `netherite`, `runic`, `corrupted_eye`, `spectral`, `radiant`, `candle`
 
 ### `borderStyle`
 
@@ -335,7 +335,7 @@ These are the built-in values you can reuse in your own theme JSON.
 
 Built-in theme keys you can reference directly:
 
-- `autumn`, `bee`, `blood`, `blossom`, `bubble`, `corrupted_eye`, `cosmic`, `deepdark`, `default`, `diamond`, `earth`, `echo`, `ember`, `enchanted`, `gold`, `honey`, `ice`, `iron`, `jade`, `lightning`, `netherite`, `obfuscated`, `ocean`, `poison`, `rarity_common`, `rarity_epic`, `rarity_mythic`, `rarity_rare`, `rarity_uncommon`, `runic`, `rustic`, `soul`, `spectral`, `stone`, `unstable`, `vine`, `wood`
+- `autumn`, `bee`, `blood`, `blossom`, `bubble`, `candle`, `corrupted_eye`, `cosmic`, `deepdark`, `default`, `diamond`, `earth`, `echo`, `ember`, `enchanted`, `gold`, `honey`, `ice`, `iron`, `jade`, `lightning`, `netherite`, `obfuscated`, `ocean`, `poison`, `radiant`, `rarity_common`, `rarity_epic`, `rarity_mythic`, `rarity_rare`, `rarity_uncommon`, `runic`, `rustic`, `soul`, `spectral`, `stone`, `unstable`, `vine`, `wood`
 
 ## 7) Reload and Test
 
