@@ -116,6 +116,8 @@
     "simplyswords:soulstalker":          { "theme": "corrupted_eye", "badges": ["UNIQUE", "SCYTHE"]   },
     "simplyswords:gloampiercer":         { "theme": "corrupted_eye", "badges": ["UNIQUE", "SPEAR"]    },
 
+    "simplyswords:riftmane":             { "theme": "spectral",  "badges": ["UNIQUE", "CLAYMORE"]   },
+
     "simplyswords:contained_remnant":     { "theme": "autumn",         "badges": ["UPGRADE"] },
     "simplyswords:tampered_remnant":      { "theme": "obfuscated",     "badges": ["UPGRADE"] },
     "simplyswords:empowered_remnant":     { "theme": "autumn",         "badges": ["UPGRADE"] },
