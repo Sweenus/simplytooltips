@@ -8,8 +8,10 @@ import net.sweenus.simplytooltips.SimplyTooltips;
 import net.sweenus.simplytooltips.client.render.BorderDefinitionRegistry;
 import net.sweenus.simplytooltips.client.render.ItemThemeRegistry;
 import net.sweenus.simplytooltips.client.render.MotifRegistry;
+import net.sweenus.simplytooltips.client.render.TabState;
 import net.sweenus.simplytooltips.client.render.ThemeRegistry;
 import net.sweenus.simplytooltips.client.render.TooltipPainter;
+import net.sweenus.simplytooltips.client.TooltipKeybinds;
 import net.sweenus.simplytooltips.client.studio.widget.ColorWheelPicker;
 import net.sweenus.simplytooltips.client.studio.widget.DropdownWidget;
 import net.sweenus.simplytooltips.client.studio.widget.StudioButton;
@@ -476,6 +478,8 @@ public class ThemeStudioScreen extends Screen {
         if (clickInspectorTab(mouseX, mouseY)) return true;
         if (tab == Tab.COLOURS && clickColorRow(mouseX, mouseY)) return true;
 
+        if (preview.hasItem() && clickTabChip(mouseX, mouseY)) return true;
+
         if (preview.hasItem() && overStage(mouseX, mouseY)) {
             long now = System.currentTimeMillis();
             if (now - lastStageClickMs < DOUBLE_CLICK_MS) {
@@ -613,6 +617,11 @@ public class ThemeStudioScreen extends Screen {
             return true;
         }
 
+        if (!typing && TooltipKeybinds.CYCLE_TAB.matchesKey(keyCode, scanCode)) {
+            preview.cycleTab();
+            return true;
+        }
+
         return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
@@ -653,6 +662,7 @@ public class ThemeStudioScreen extends Screen {
         context.getMatrices().translate(0.0f, 0.0f, OVERLAY_Z);
 
         drawZoomBadge(context);
+        drawTabChips(context, mouseX, mouseY);
         drawSuggestions(context, mouseX, mouseY);
         for (DropdownWidget dropdown : dropdowns) dropdown.renderPopup(context, mouseX, mouseY);
         if (picker != null) picker.render(context, mouseX, mouseY);
@@ -767,6 +777,59 @@ public class ThemeStudioScreen extends Screen {
 
         StudioTheme.card(context, bx, by, noteW + 8, 12, StudioTheme.PANEL, StudioTheme.PANEL_EDGE);
         context.drawText(textRenderer, note, bx + 4, by + 2, StudioTheme.TEXT_BODY, false);
+    }
+
+    /** X of the tab chip at {@code index}, or the row's right edge when {@code index} is the count. */
+    private int tabChipX(int index) {
+        int x = stageX + 12;
+        List<TabState.Tab> tabs = preview.availableTabs();
+        for (int i = 0; i < index && i < tabs.size(); i++) {
+            x += textRenderer.getWidth(tabs.get(i).name()) + 10;
+        }
+        return x;
+    }
+
+    /**
+     * Tab chips, drawn with the overlays for the same reason the zoom badge is: they sit on top of
+     * the preview, which lifts itself to z=400.
+     */
+    private void drawTabChips(DrawContext context, int mouseX, int mouseY) {
+        List<TabState.Tab> tabs = preview.availableTabs();
+        if (tabs.size() < 2) return;
+
+        TabState.Tab active = preview.activeTab();
+        int y = stageBoxY + 4;
+
+        for (int i = 0; i < tabs.size(); i++) {
+            TabState.Tab tab = tabs.get(i);
+            String label = tab.name();
+            int w = textRenderer.getWidth(label) + 8;
+            int x = tabChipX(i);
+            if (x + w > stageX + stageW - 8) break;
+
+            boolean selected = tab == active;
+            boolean hot = StudioTheme.inside(mouseX, mouseY, x, y, w, 12);
+            StudioTheme.card(context, x, y, w, 12,
+                    selected ? StudioTheme.PRIMARY_FILL : StudioTheme.PANEL,
+                    selected ? StudioTheme.ACCENT : (hot ? StudioTheme.ACCENT_DIM : StudioTheme.PANEL_EDGE));
+            context.drawText(textRenderer, label, x + 4, y + 2,
+                    selected ? StudioTheme.ACCENT : StudioTheme.TEXT_BODY, false);
+        }
+    }
+
+    private boolean clickTabChip(double mouseX, double mouseY) {
+        List<TabState.Tab> tabs = preview.availableTabs();
+        if (tabs.size() < 2) return false;
+        int y = stageBoxY + 4;
+
+        for (int i = 0; i < tabs.size(); i++) {
+            int w = textRenderer.getWidth(tabs.get(i).name()) + 8;
+            if (StudioTheme.inside(mouseX, mouseY, tabChipX(i), y, w, 12)) {
+                preview.setActiveTab(tabs.get(i));
+                return true;
+            }
+        }
+        return false;
     }
 
     private void drawColorRows(DrawContext context, int mouseX, int mouseY) {

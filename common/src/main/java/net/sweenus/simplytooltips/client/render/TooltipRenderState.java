@@ -50,6 +50,8 @@ public final class TooltipRenderState {
         final @Nullable ThemeDefinition forcedDef;
         /** When set, replaces the badges the item would otherwise resolve to. */
         final @Nullable java.util.List<String> forcedBadges;
+        /** Preview only: which tab to show, instead of the global hover selection. */
+        final @Nullable TabState.Tab forcedTab;
         /** When set, the panel's top-left corner, replacing the cursor-relative offset and clamp. */
         final @Nullable Integer originX;
         final @Nullable Integer originY;
@@ -61,12 +63,13 @@ public final class TooltipRenderState {
 
         /** Export state: the original four-argument shape, unchanged. */
         public State(boolean measureOnly, long elapsedMs, long absoluteTimeMs, int margin) {
-            this(Mode.EXPORT, measureOnly, elapsedMs, absoluteTimeMs, margin, null, null, null, null);
+            this(Mode.EXPORT, measureOnly, elapsedMs, absoluteTimeMs, margin, null, null, null, null, null);
         }
 
         public State(Mode mode, boolean measureOnly, long elapsedMs, long absoluteTimeMs, int margin,
                      @Nullable ThemeDefinition forcedDef,
                      @Nullable java.util.List<String> forcedBadges,
+                     @Nullable TabState.Tab forcedTab,
                      @Nullable Integer originX, @Nullable Integer originY) {
             this.mode = mode;
             this.measureOnly = measureOnly;
@@ -75,6 +78,7 @@ public final class TooltipRenderState {
             this.margin = margin;
             this.forcedDef = forcedDef;
             this.forcedBadges = forcedBadges;
+            this.forcedTab = forcedTab;
             this.originX = originX;
             this.originY = originY;
         }
@@ -87,9 +91,24 @@ public final class TooltipRenderState {
          */
         public static State preview(boolean measureOnly, @Nullable ThemeDefinition forcedDef,
                                     @Nullable java.util.List<String> forcedBadges,
+                                    @Nullable TabState.Tab forcedTab,
                                     int originX, int originY, long elapsedMs) {
             return new State(Mode.PREVIEW, measureOnly, elapsedMs, System.currentTimeMillis(), 0,
-                    forcedDef, forcedBadges, originX, originY);
+                    forcedDef, forcedBadges, forcedTab, originX, originY);
+        }
+
+        /**
+         * Tabs this item offers, reported back by the renderer so the screen can build its control.
+         * The preview never publishes into the global {@code TabState}.
+         */
+        java.util.List<TabState.Tab> availableTabs = java.util.List.of();
+
+        void recordTabs(java.util.List<TabState.Tab> tabs) {
+            this.availableTabs = java.util.List.copyOf(tabs);
+        }
+
+        public java.util.List<TabState.Tab> availableTabs() {
+            return availableTabs;
         }
 
         void recordPanel(int panelWidth, int panelHeight) {

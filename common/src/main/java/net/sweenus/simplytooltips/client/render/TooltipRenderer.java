@@ -275,20 +275,32 @@ public class TooltipRenderer {
         Identifier itemId = Registries.ITEM.getId(stack.getItem());
         if (!overrideMode) ScrollState.notifyItem(itemId);
 
+        final boolean previewMode = overrideMode && renderState.isPreview();
+        final boolean exportMode  = overrideMode && !previewMode;
+
+        // Built for hovers and previews alike, so the Studio can offer the same tabs the game would.
         List<TabState.Tab> availableTabs = new ArrayList<>();
-        if (!overrideMode && TooltipNavigationConfig.tooltipTabs()) {
+        if (!exportMode && TooltipNavigationConfig.tooltipTabs()) {
             if (!wrappedAbility.isEmpty() || !wrappedCustom.isEmpty())        availableTabs.add(TabState.Tab.LORE);
             if (model.upgradeSection() != null)                               availableTabs.add(TabState.Tab.FORGE);
             if (!wrappedBody.isEmpty() || !wrappedExtra.isEmpty())            availableTabs.add(TabState.Tab.STATS);
             if (!wrappedAffixes.isEmpty())                                    availableTabs.add(TabState.Tab.AFFIXES);
-            TabState.notifyItem(itemId, availableTabs);
+            if (!overrideMode) TabState.notifyItem(itemId, availableTabs);
         }
+        if (previewMode) renderState.recordTabs(availableTabs);
 
-        boolean tabsActive   = !overrideMode && TooltipNavigationConfig.tooltipTabs() && TabState.multiTab();
-        boolean drawLore     = overrideMode || !tabsActive || TabState.activeTab() == TabState.Tab.LORE;
-        boolean drawForge    = !overrideMode && (!tabsActive || TabState.activeTab() == TabState.Tab.FORGE);
-        boolean drawStats    = !overrideMode && (!tabsActive || TabState.activeTab() == TabState.Tab.STATS);
-        boolean drawAffixes  = !overrideMode && (!tabsActive || TabState.activeTab() == TabState.Tab.AFFIXES);
+        TabState.Tab activeTab = previewMode
+                ? resolvePreviewTab(renderState.forcedTab, availableTabs)
+                : TabState.activeTab();
+
+        SectionVisibility sections = SectionVisibility.of(exportMode, previewMode,
+                TooltipNavigationConfig.tooltipTabs(), availableTabs.size(), TabState.multiTab(), activeTab);
+
+        boolean tabsActive   = sections.tabsActive();
+        boolean drawLore     = sections.lore();
+        boolean drawForge    = sections.forge();
+        boolean drawStats    = sections.stats();
+        boolean drawAffixes  = sections.affixes();
 
         // ---- Layout ----
         int lineHeight  = tr.fontHeight + lineSpacing();
@@ -1052,7 +1064,7 @@ public class TooltipRenderer {
         if (tabsActive) {
             String cycleTabKey = TooltipKeybinds.CYCLE_TAB.getBoundKeyLocalizedText().getString();
             TooltipPainter.drawTabDotsWithKeyHint(context, tr, panelX + panelW / 2, panelY + panelH - 8,
-                    TabState.tabs(), TabState.activeTab(), theme, cycleTabKey);
+                    previewMode ? availableTabs : TabState.tabs(), activeTab, theme, cycleTabKey);
         } else {
             TooltipPainter.drawFooterDots(context, panelX + panelW / 2, panelY + panelH - 8, theme);
         }
@@ -1115,6 +1127,13 @@ public class TooltipRenderer {
         // 5. Rarity fallback
         Rarity rarity = stack.getRarity();
         return ThemeRegistry.get(rarityThemeKey(rarity != null ? rarity : Rarity.COMMON));
+    }
+
+    /** Falls back to the first available tab when the screen's choice is stale or unset. */
+    private static TabState.Tab resolvePreviewTab(TabState.Tab forced, List<TabState.Tab> available) {
+        if (available.isEmpty()) return TabState.Tab.STATS;
+        if (forced != null && available.contains(forced)) return forced;
+        return available.get(0);
     }
 
     /** Maps a vanilla {@link Rarity} to the corresponding rarity theme key. */

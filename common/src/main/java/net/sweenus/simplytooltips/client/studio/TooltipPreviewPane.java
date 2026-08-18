@@ -11,6 +11,7 @@ import net.minecraft.util.Identifier;
 import net.sweenus.simplytooltips.api.ThemeDefinition;
 import net.sweenus.simplytooltips.api.TooltipProvider;
 import net.sweenus.simplytooltips.api.TooltipProviderRegistry;
+import net.sweenus.simplytooltips.client.render.TabState;
 import net.sweenus.simplytooltips.client.render.TooltipRenderState;
 import net.sweenus.simplytooltips.client.render.TooltipRenderer;
 
@@ -38,6 +39,9 @@ public final class TooltipPreviewPane {
     private final PreviewViewport viewport = new PreviewViewport();
 
     private List<String> forcedBadges;
+
+    private TabState.Tab activeTab;
+    private List<TabState.Tab> availableTabs = List.of();
 
     private long shownAtMs = System.currentTimeMillis();
     private int lastPanelW;
@@ -71,6 +75,8 @@ public final class TooltipPreviewPane {
     public void setStack(ItemStack newStack) {
         MinecraftClient client = MinecraftClient.getInstance();
         this.stack = newStack.copy();
+        this.activeTab = null;
+        this.availableTabs = List.of();
         this.error = null;
         this.rawLines = Screen.getTooltipFromItem(client, this.stack);
         this.provider = TooltipProviderRegistry.find(this.stack).orElse(null);
@@ -85,6 +91,27 @@ public final class TooltipPreviewPane {
 
     public PreviewViewport viewport() {
         return viewport;
+    }
+
+    /** Tabs the previewed item offers, as reported by the last render. */
+    public List<TabState.Tab> availableTabs() {
+        return availableTabs;
+    }
+
+    public TabState.Tab activeTab() {
+        if (activeTab != null && availableTabs.contains(activeTab)) return activeTab;
+        return availableTabs.isEmpty() ? null : availableTabs.get(0);
+    }
+
+    public void setActiveTab(TabState.Tab tab) {
+        this.activeTab = tab;
+    }
+
+    /** Advances to the next available tab, matching what the cycle keybind does in game. */
+    public void cycleTab() {
+        if (availableTabs.size() < 2) return;
+        int index = availableTabs.indexOf(activeTab());
+        activeTab = availableTabs.get(Math.floorMod(index + 1, availableTabs.size()));
     }
 
     /**
@@ -131,11 +158,12 @@ public final class TooltipPreviewPane {
         if (!hasItem()) return;
         MinecraftClient client = MinecraftClient.getInstance();
         TooltipRenderState.State measure =
-                TooltipRenderState.State.preview(true, forced, forcedBadges, 0, 0, elapsed());
+                TooltipRenderState.State.preview(true, forced, forcedBadges, activeTab(), 0, 0, elapsed());
         TooltipRenderState.run(measure, () -> TooltipRenderer.render(
                 context, client.textRenderer, stack, rawLines, provider, 0, 0, 32_768, 32_768));
         lastPanelW = measure.panelWidth();
         lastPanelH = measure.panelHeight();
+        availableTabs = measure.availableTabs();
     }
 
     /** Measures, then draws centred inside the given rectangle, scaled down only if it must be. */
@@ -155,7 +183,7 @@ public final class TooltipPreviewPane {
         context.getMatrices().scale(scale, scale, 1.0f);
 
         TooltipRenderState.State render =
-                TooltipRenderState.State.preview(false, forced, forcedBadges, 0, 0, elapsed());
+                TooltipRenderState.State.preview(false, forced, forcedBadges, activeTab(), 0, 0, elapsed());
         TooltipRenderState.run(render, () -> TooltipRenderer.render(
                 context, client.textRenderer, stack, rawLines, provider, 0, 0, 32_768, 32_768));
 

@@ -378,6 +378,11 @@ The screen has three columns:
   | Mouse wheel | Zoom toward the cursor, snapping to `25% 33% 50% 100% 200% 300% 400%` |
   | Left-drag | Pan (only where the tooltip is bigger than the stage) |
   | Double-click | Back to fit |
+  | Tab chips / `G` | Switch tab, when the item has more than one and `general.tooltipTabs` is on |
+
+  The preview honours `general.tooltipTabs`: with tabs on you get the same tab dots and key hint the
+  real tooltip shows, and with tabs off every section is stacked in one panel — whichever the player
+  would actually see.
 - **Right** — the editor. **COLOURS** lists all 19 colours (click one for a colour wheel with
   value and alpha bars), **STYLE** holds `motif`, `borderStyle`, the two animation styles,
   `itemBorderShape` and `textShadow`, and **TEXT** edits `customTextKeys`.
