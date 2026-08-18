@@ -77,5 +77,18 @@ public class BorderDefinitionRegistry {
         SimplyTooltips.LOGGER.info("[SimplyTooltips] Loaded {} border definition(s)", DEFINITIONS.size());
     }
 
+    /**
+     * Every key {@link #resolve(String)} can turn into a real border: {@code "none"}, every loaded
+     * {@code borders/*.json} definition, and every registered {@link BorderRegistry} pattern.
+     */
+    public static java.util.List<String> styleKeys() {
+        java.util.TreeSet<String> keys = new java.util.TreeSet<>(DEFINITIONS.keySet());
+        keys.addAll(BorderRegistry.keys());
+        java.util.List<String> ordered = new java.util.ArrayList<>();
+        ordered.add("none");
+        ordered.addAll(keys);
+        return java.util.Collections.unmodifiableList(ordered);
+    }
+
     private BorderDefinitionRegistry() {}
 }

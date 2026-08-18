@@ -291,7 +291,7 @@ These are the built-in values you can reuse in your own theme JSON.
 ### `motif`
 
 - `none`
-- `vine`, `ember`, `enchanted`, `bee`, `blossom`, `bubble`, `earth`, `echo`, `cosmic`, `ice`, `lightning`, `autumn`, `soul`, `deepdark`, `poison`, `blood`, `ocean`, `rustic`, `honey`, `jade`, `wood`, `stone`, `iron`, `gold`, `diamond`, `netherite`, `runic`, `corrupted_eye`, `spectral`, `radiant`, `candle`
+- `vine`, `ember`, `enchanted`, `bee`, `blossom`, `bubble`, `earth`, `echo`, `cosmic`, `ice`, `lightning`, `autumn`, `soul`, `deepdark`, `poison`, `blood`, `ocean`, `rustic`, `honey`, `jade`, `wood`, `stone`, `iron`, `gold`, `diamond`, `netherite`, `runic`, `corrupted_eye`, `spectral`, `radiant`, `candle`, `amethyst`, `tome`
 
 ### `borderStyle`
 
@@ -321,6 +321,15 @@ These are the built-in values you can reuse in your own theme JSON.
 - `obfuscate`
 - `static`
 
+### `textShadow`
+
+- `true` (default) — text is drawn with Minecraft's built-in drop shadow.
+- `false` — text is drawn flat, with no shadow.
+
+Minecraft derives the shadow by darkening the text colour, so on a **light background with dark
+text** the shadow is near-black and smears the 1px glyph strokes. Light themes should set this to
+`false`. Omitting the key keeps the shadow, so existing themes are unaffected.
+
 ### `itemBorderShape`
 
 - `diamond`
@@ -338,7 +347,7 @@ These are the built-in values you can reuse in your own theme JSON.
 
 Built-in theme keys you can reference directly:
 
-- `autumn`, `bee`, `blood`, `blossom`, `bubble`, `candle`, `corrupted_eye`, `cosmic`, `deepdark`, `default`, `diamond`, `earth`, `echo`, `ember`, `enchanted`, `gold`, `honey`, `ice`, `iron`, `jade`, `lightning`, `netherite`, `obfuscated`, `ocean`, `poison`, `radiant`, `rarity_common`, `rarity_epic`, `rarity_mythic`, `rarity_rare`, `rarity_uncommon`, `runic`, `rustic`, `soul`, `spectral`, `stone`, `unstable`, `vine`, `wood`
+- `amethyst`, `autumn`, `bee`, `blood`, `blossom`, `bubble`, `candle`, `corrupted_eye`, `cosmic`, `deepdark`, `default`, `diamond`, `earth`, `echo`, `ember`, `enchanted`, `gold`, `honey`, `ice`, `iron`, `jade`, `lightning`, `netherite`, `obfuscated`, `ocean`, `poison`, `radiant`, `rarity_common`, `rarity_epic`, `rarity_mythic`, `rarity_rare`, `rarity_uncommon`, `runic`, `rustic`, `soul`, `spectral`, `stone`, `tome`, `unstable`, `vine`, `wood`
 
 ## 7) Reload and Test
 
@@ -348,7 +357,65 @@ Built-in theme keys you can reference directly:
   - `general.applyTooltipsToVanillaItems`
   - `general.applyTooltipsToModItems`
 
-## 8) Addon Mod Integration: Simply Swords Compat
+## 8) Theme Studio (in-game editor)
+
+Run `/simplytooltips` in game to open the Theme Studio.
+
+| Command | Does |
+| --- | --- |
+| `/simplytooltips` | Opens the Studio on the item you are holding |
+| `/simplytooltips <item_id>` | Opens it previewing that item |
+| `/simplytooltips reload` | Re-reads `config/simplytooltips/` without a resource reload |
+
+The screen has three columns:
+
+- **Left** — every known theme, searchable. A gold dot marks a theme you can edit.
+- **Middle** — the item id, its badges, and a **live preview** of the real tooltip. Use `<` `>`
+  or the arrow keys to cycle themes and watch the preview change. Editing the badges field updates
+  the preview immediately; clearing it goes back to the item's own badges.
+  Tall tooltips are scaled to fit and the percentage is shown; the preview is not scrollable or
+  tab-switchable.
+
+  | In the preview | Does |
+  | --- | --- |
+  | Mouse wheel | Zoom toward the cursor, snapping to `25% 33% 50% 100% 200% 300% 400%` |
+  | Left-drag | Pan (only where the tooltip is bigger than the stage) |
+  | Double-click | Back to fit |
+  | Tab chips / `G` | Switch tab, when the item has more than one and `general.tooltipTabs` is on |
+
+  Typing in the item field suggests matching ids: `Up`/`Down` to highlight one, `Tab` or `Enter` to
+  accept it, `Esc` to dismiss the list, or just click a row.
+
+  The preview honours `general.tooltipTabs`: with tabs on you get the same tab dots and key hint the
+  real tooltip shows, and with tabs off every section is stacked in one panel — whichever the player
+  would actually see.
+- **Right** — the editor. **COLOURS** lists all 19 colours (click one for a colour wheel with
+  value and alpha bars), **STYLE** holds `motif`, `borderStyle`, the two animation styles,
+  `itemBorderShape` and `textShadow`, and **TEXT** edits `customTextKeys`.
+
+### Saving
+
+Everything the Studio writes goes to the config folder, never into the mod jar or a resource pack:
+
+```text
+<gamedir>/config/simplytooltips/
+  themes/
+    my_theme.json      <- Save as new / Override
+  item_themes/
+    studio.json        <- Assign to item
+```
+
+These are loaded **after** resource packs and win over them, so a save applies immediately — no
+pack to enable and no `F3 + T`. The files use exactly the schema in sections 2 and 3, so you can
+copy one into a resource pack to ship it.
+
+- **Save as new** always works. Keys must be lowercase `a-z 0-9 _ - .`.
+- **Override** replaces a theme you already saved. It is disabled for the themes built into the
+  mod — those can be opened, edited and saved under a new key, but never overwritten.
+- **Assign to item** writes the current item and badges into `item_themes/studio.json`, which
+  overrides the shipped `defaults.json` for that item.
+
+## 9) Addon Mod Integration: Simply Swords Compat
 
 If your mod adds items that follow the Simply Swords tooltip structure, you can
 opt them into the full Simply Swords rendering pipeline with a single data file.

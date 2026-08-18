@@ -119,9 +119,9 @@ public class TooltipPainter {
     /** Draws the static value label associated with an item-frame progress trace. */
     public static void drawItemFrameProgressLabel(DrawContext context, TextRenderer tr,
                                                   ItemFrameProgress progress,
-                                                  int x, int y, long timeMs) {
+                                                  int x, int y, long timeMs, boolean shadow) {
         if (progress == null) return;
-        context.drawText(tr, progress.levelLabel(), x, y, progress.progressColor(), true);
+        context.drawText(tr, progress.levelLabel(), x, y, progress.progressColor(), shadow);
     }
 
     private static void drawFrameHighlight(DrawContext context, List<int[]> path,
@@ -565,6 +565,11 @@ public class TooltipPainter {
      */
     public static void drawWaveText(DrawContext context, TextRenderer tr, String text,
                                     int x, int y, int color, long timeMs) {
+        drawWaveText(context, tr, text, x, y, color, timeMs, true);
+    }
+
+    public static void drawWaveText(DrawContext context, TextRenderer tr, String text,
+                                    int x, int y, int color, long timeMs, boolean shadow) {
         if (text == null || text.isEmpty()) return;
 
         final int    length    = text.length();
@@ -591,7 +596,7 @@ public class TooltipPainter {
             int yOffset = (int) Math.round(-influence * amplitude);
             context.drawText(tr,
                     Text.literal(ch).setStyle(Style.EMPTY.withColor(TextColor.fromRgb(color & 0x00FFFFFF))),
-                    cursorX, y + yOffset, color, true);
+                    cursorX, y + yOffset, color, shadow);
             cursorX += tr.getWidth(ch);
         }
     }
@@ -602,6 +607,11 @@ public class TooltipPainter {
      */
     public static void drawShimmerText(DrawContext context, TextRenderer tr, String text,
                                        int x, int y, int color, long timeMs) {
+        drawShimmerText(context, tr, text, x, y, color, timeMs, true);
+    }
+
+    public static void drawShimmerText(DrawContext context, TextRenderer tr, String text,
+                                       int x, int y, int color, long timeMs, boolean shadow) {
         if (text == null || text.isEmpty()) return;
 
         final int    length   = text.length();
@@ -632,7 +642,7 @@ public class TooltipPainter {
             int c = (baseA << 24) | (r << 16) | (g << 8) | b;
             context.drawText(tr,
                     Text.literal(ch).setStyle(Style.EMPTY.withColor(TextColor.fromRgb(c & 0x00FFFFFF))),
-                    cursorX, y, c, true);
+                    cursorX, y, c, shadow);
             cursorX += tr.getWidth(ch);
         }
     }
@@ -643,6 +653,11 @@ public class TooltipPainter {
      */
     public static void drawPulseText(DrawContext context, TextRenderer tr, String text,
                                      int x, int y, int color, long timeMs) {
+        drawPulseText(context, tr, text, x, y, color, timeMs, true);
+    }
+
+    public static void drawPulseText(DrawContext context, TextRenderer tr, String text,
+                                     int x, int y, int color, long timeMs, boolean shadow) {
         if (text == null || text.isEmpty()) return;
 
         double pulse  = 0.5 * (1.0 + Math.sin(timeMs * 0.0022)); // 0.0 → 1.0
@@ -655,7 +670,7 @@ public class TooltipPainter {
         int c = (baseA << 24) | (r << 16) | (g << 8) | b;
         context.drawText(tr,
                 Text.literal(text).setStyle(Style.EMPTY.withColor(TextColor.fromRgb(c & 0x00FFFFFF))),
-                x, y, c, true);
+                x, y, c, shadow);
     }
 
     /**
@@ -664,6 +679,11 @@ public class TooltipPainter {
      */
     public static void drawFlickerText(DrawContext context, TextRenderer tr, String text,
                                        int x, int y, int color, long timeMs) {
+        drawFlickerText(context, tr, text, x, y, color, timeMs, true);
+    }
+
+    public static void drawFlickerText(DrawContext context, TextRenderer tr, String text,
+                                       int x, int y, int color, long timeMs, boolean shadow) {
         if (text == null || text.isEmpty()) return;
 
         double flicker = Math.sin(timeMs * 0.0317) * Math.cos(timeMs * 0.0193 + 1.2);
@@ -676,7 +696,7 @@ public class TooltipPainter {
         int c = (baseA << 24) | (r << 16) | (g << 8) | b;
         context.drawText(tr,
                 Text.literal(text).setStyle(Style.EMPTY.withColor(TextColor.fromRgb(c & 0x00FFFFFF))),
-                x, y, c, true);
+                x, y, c, shadow);
     }
 
     /**
@@ -685,6 +705,11 @@ public class TooltipPainter {
      */
     public static void drawShiverText(DrawContext context, TextRenderer tr, String text,
                                       int x, int y, int color, long timeMs) {
+        drawShiverText(context, tr, text, x, y, color, timeMs, true);
+    }
+
+    public static void drawShiverText(DrawContext context, TextRenderer tr, String text,
+                                      int x, int y, int color, long timeMs, boolean shadow) {
         if (text == null || text.isEmpty()) return;
 
         int cursorX = x;
@@ -699,7 +724,7 @@ public class TooltipPainter {
 
             context.drawText(tr,
                     Text.literal(ch).setStyle(Style.EMPTY.withColor(TextColor.fromRgb(color & 0x00FFFFFF))),
-                    cursorX + xOffset, y + yOffset, color, true);
+                    cursorX + xOffset, y + yOffset, color, shadow);
 
             cursorX += charW;
         }
@@ -711,6 +736,11 @@ public class TooltipPainter {
      */
     public static void drawQuiverText(DrawContext context, TextRenderer tr, String text,
                                       int x, int y, int color, long timeMs) {
+        drawQuiverText(context, tr, text, x, y, color, timeMs, true);
+    }
+
+    public static void drawQuiverText(DrawContext context, TextRenderer tr, String text,
+                                      int x, int y, int color, long timeMs, boolean shadow) {
         if (text == null || text.isEmpty()) return;
 
         int cursorX = x;
@@ -724,7 +754,7 @@ public class TooltipPainter {
 
             context.drawText(tr,
                     Text.literal(ch).setStyle(Style.EMPTY.withColor(TextColor.fromRgb(color & 0x00FFFFFF))),
-                    cursorX + xOffset, y + yOffset, color, true);
+                    cursorX + xOffset, y + yOffset, color, shadow);
 
             cursorX += charW;
         }
@@ -736,6 +766,11 @@ public class TooltipPainter {
      */
     public static void drawBreatheSpinBobText(DrawContext context, TextRenderer tr, String text,
                                               int x, int y, int color, long timeMs) {
+        drawBreatheSpinBobText(context, tr, text, x, y, color, timeMs, true);
+    }
+
+    public static void drawBreatheSpinBobText(DrawContext context, TextRenderer tr, String text,
+                                              int x, int y, int color, long timeMs, boolean shadow) {
         if (text == null || text.isEmpty()) return;
 
         int textW = tr.getWidth(text);
@@ -754,7 +789,7 @@ public class TooltipPainter {
 
         context.drawText(tr,
                 Text.literal(text).setStyle(Style.EMPTY.withColor(TextColor.fromRgb(color & 0x00FFFFFF))),
-                x, y, color, true);
+                x, y, color, shadow);
 
         context.getMatrices().pop();
     }
@@ -767,6 +802,11 @@ public class TooltipPainter {
      */
     public static void drawDropBounceText(DrawContext context, TextRenderer tr, String text,
                                           int x, int y, int color, long elapsedMs) {
+        drawDropBounceText(context, tr, text, x, y, color, elapsedMs, true);
+    }
+
+    public static void drawDropBounceText(DrawContext context, TextRenderer tr, String text,
+                                          int x, int y, int color, long elapsedMs, boolean shadow) {
         if (text == null || text.isEmpty()) return;
 
         final long charDelayMs   = 34L;
@@ -801,7 +841,7 @@ public class TooltipPainter {
 
             context.drawText(tr,
                     Text.literal(ch).setStyle(Style.EMPTY.withColor(TextColor.fromRgb(color & 0x00FFFFFF))),
-                    cursorX, y + yOffset, color, true);
+                    cursorX, y + yOffset, color, shadow);
 
             cursorX += charW;
         }
@@ -815,6 +855,11 @@ public class TooltipPainter {
      */
     public static void drawHingeFallText(DrawContext context, TextRenderer tr, String text,
                                          int x, int y, int color, long elapsedMs) {
+        drawHingeFallText(context, tr, text, x, y, color, elapsedMs, true);
+    }
+
+    public static void drawHingeFallText(DrawContext context, TextRenderer tr, String text,
+                                         int x, int y, int color, long elapsedMs, boolean shadow) {
         if (text == null || text.isEmpty()) return;
 
         final long introCharDelayMs = 16L;
@@ -886,7 +931,7 @@ public class TooltipPainter {
 
                 context.drawText(tr,
                         Text.literal(ch).setStyle(Style.EMPTY.withColor(TextColor.fromRgb(color & 0x00FFFFFF))),
-                        cursorXIntro, y + yOffset, color, true);
+                        cursorXIntro, y + yOffset, color, shadow);
                 cursorXIntro += charW;
             }
             return;
@@ -901,7 +946,7 @@ public class TooltipPainter {
             if (i != hingeTargetIndex) {
                 context.drawText(tr,
                         Text.literal(ch).setStyle(Style.EMPTY.withColor(TextColor.fromRgb(color & 0x00FFFFFF))),
-                        cursorX, y, color, true);
+                        cursorX, y, color, shadow);
                 cursorX += charW;
                 continue;
             }
@@ -912,7 +957,7 @@ public class TooltipPainter {
             if (t <= 0L) {
                 context.drawText(tr,
                         Text.literal(ch).setStyle(Style.EMPTY.withColor(TextColor.fromRgb(color & 0x00FFFFFF))),
-                        cursorX, y, color, true);
+                        cursorX, y, color, shadow);
                 cursorX += charW;
                 continue;
             }
@@ -931,7 +976,7 @@ public class TooltipPainter {
                 context.getMatrices().translate(-pivotX, -pivotY, 0.0F);
                 context.drawText(tr,
                         Text.literal(ch).setStyle(Style.EMPTY.withColor(TextColor.fromRgb(color & 0x00FFFFFF))),
-                        cursorX, y, color, true);
+                        cursorX, y, color, shadow);
                 context.getMatrices().pop();
 
                 cursorX += charW;
@@ -956,7 +1001,7 @@ public class TooltipPainter {
                 context.getMatrices().translate(-centerX, -centerY, 0.0F);
                 context.drawText(tr,
                         Text.literal(ch).setStyle(Style.EMPTY.withColor(TextColor.fromRgb(color & 0x00FFFFFF))),
-                        (int) drawX, (int) drawY, color, true);
+                        (int) drawX, (int) drawY, color, shadow);
                 context.getMatrices().pop();
             }
             // After fall phase: do not draw this character anymore in current tooltip session.
@@ -973,6 +1018,11 @@ public class TooltipPainter {
      */
     public static void drawObfuscateText(DrawContext context, TextRenderer tr, String text,
                                          int x, int y, int color, long elapsedMs) {
+        drawObfuscateText(context, tr, text, x, y, color, elapsedMs, true);
+    }
+
+    public static void drawObfuscateText(DrawContext context, TextRenderer tr, String text,
+                                         int x, int y, int color, long elapsedMs, boolean shadow) {
         if (text == null || text.isEmpty()) return;
 
         boolean reset = elapsedMs < obfLastElapsedMs
@@ -1010,7 +1060,7 @@ public class TooltipPainter {
             Style style = Style.EMPTY
                     .withColor(TextColor.fromRgb(color & 0x00FFFFFF))
                     .withObfuscated(obfActive[i]);
-            context.drawText(tr, Text.literal(ch).setStyle(style), cursorX, y, color, true);
+            context.drawText(tr, Text.literal(ch).setStyle(style), cursorX, y, color, shadow);
             cursorX += tr.getWidth(ch);
         }
     }

@@ -123,13 +123,13 @@ public class TooltipRenderer {
         context.getMatrices().push();
         context.getMatrices().translate(0.0f, 0.0f, 400.0f);
 
-        TooltipExportRenderState.State exportState = TooltipExportRenderState.current();
-        boolean exportMode = exportState != null;
+        TooltipRenderState.State renderState = TooltipRenderState.current();
+        boolean overrideMode = renderState != null;
         List<TooltipComponent> gatheredNativeComponents = nativeComponents != null
                 ? nativeComponents : List.of();
 
         boolean altDown = false;
-        if (!exportMode) {
+        if (!overrideMode) {
             try { altDown = Screen.hasAltDown(); } catch (Throwable ignored) {}
         }
 
@@ -159,10 +159,15 @@ public class TooltipRenderer {
         final List<InlineStatRow> extraStats;
         final int                 statValueColumnW;
 
+        final ThemeDefinition forcedDef = overrideMode ? renderState.forcedDef : null;
+        final List<String> forcedBadges = overrideMode ? renderState.forcedBadges : null;
+
         if (mbc != null
                 && ItemStack.areEqual(mbc.stack, stack)
                 && mbc.altDown == altDown
                 && mbc.maxW    == currMaxW
+                && mbc.forcedDef == forcedDef
+                && mbc.forcedBadges == forcedBadges
                 && mbc.rawLines.equals(rawLines)) {
             // Cache hit — reuse everything from the previous frame.
             model             = mbc.model;
@@ -191,18 +196,23 @@ public class TooltipRenderer {
             builtModel  = ApotheosisCompat.augment(builtModel, rawLines, stack, altDown);
             model       = builtModel;
 
-            // Resolve theme via priority chain: component > item > provider > tag > rarity
-            ThemeDefinition builtDef = resolveTheme(stack, model);
+            // Resolve theme via priority chain: component > item > provider > tag > rarity,
+            // unless a preview has forced one.
+            ThemeDefinition builtDef = forcedDef != null ? forcedDef : resolveTheme(stack, model);
             resolvedDef  = builtDef;
             final String motifStr = resolvedDef.motif();
-            borderDef        = BorderDefinitionRegistry.resolve(resolveBorderKey(stack, resolvedDef));
+            String borderKey = forcedDef != null ? forcedDef.border() : resolveBorderKey(stack, resolvedDef);
+            borderDef        = BorderDefinitionRegistry.resolve(borderKey);
             resolvedMotifKey = "none".equals(motifStr) ? null : motifStr;
             itemAnimStyle    = resolvedDef.itemAnimStyle();
             titleAnimStyle   = resolvedDef.titleAnimStyle();
             itemBorderShape  = resolvedDef.itemBorderShape();
 
-            // Data-driven badge override: item_themes JSON can replace the provider's default badges
-            List<String> dataBadges = ItemThemeRegistry.resolveBadgesForStack(stack);
+            // Data-driven badge override: item_themes JSON can replace the provider's default badges,
+            // and a preview can override that again without touching the item's mapping.
+            List<String> dataBadges = forcedBadges != null
+                    ? forcedBadges
+                    : ItemThemeRegistry.resolveBadgesForStack(stack);
             // Providers may use ALT to deliberately replace the normal data-driven badges
             // with progress information (for example a weapon awakening level).
             badges = altDown && model.itemFrameProgress() != null
@@ -243,7 +253,7 @@ public class TooltipRenderer {
                     : List.of();
 
             modelBuildCache = new ModelBuildCache(
-                    stack, List.copyOf(rawLines), altDown, currMaxW,
+                    stack, List.copyOf(rawLines), altDown, currMaxW, forcedDef, forcedBadges,
                     model, resolvedDef, borderDef, resolvedMotifKey,
                     itemAnimStyle, titleAnimStyle, itemBorderShape,
                     badges, abilitySection,
@@ -258,28 +268,40 @@ public class TooltipRenderer {
                 .toList();
 
         final TooltipTheme theme = resolvedDef.colors();
-        long tooltipElapsedMs = exportMode
-                ? exportState.elapsedMs
+        long tooltipElapsedMs = overrideMode
+                ? renderState.elapsedMs
                 : TooltipAnimator.updateAndGetElapsed(stack, model.animKeyExtra());
 
         // ---- Tab and scroll state ----
         Identifier itemId = Registries.ITEM.getId(stack.getItem());
-        if (!exportMode) ScrollState.notifyItem(itemId);
+        if (!overrideMode) ScrollState.notifyItem(itemId);
 
+        final boolean previewMode = overrideMode && renderState.isPreview();
+        final boolean exportMode  = overrideMode && !previewMode;
+
+        // Built for hovers and previews alike, so the Studio can offer the same tabs the game would.
         List<TabState.Tab> availableTabs = new ArrayList<>();
         if (!exportMode && TooltipNavigationConfig.tooltipTabs()) {
             if (!wrappedAbility.isEmpty() || !wrappedCustom.isEmpty())        availableTabs.add(TabState.Tab.LORE);
             if (model.upgradeSection() != null)                               availableTabs.add(TabState.Tab.FORGE);
             if (!wrappedBody.isEmpty() || !wrappedExtra.isEmpty())            availableTabs.add(TabState.Tab.STATS);
             if (!wrappedAffixes.isEmpty())                                    availableTabs.add(TabState.Tab.AFFIXES);
-            TabState.notifyItem(itemId, availableTabs);
+            if (!overrideMode) TabState.notifyItem(itemId, availableTabs);
         }
+        if (previewMode) renderState.recordTabs(availableTabs);
 
-        boolean tabsActive   = !exportMode && TooltipNavigationConfig.tooltipTabs() && TabState.multiTab();
-        boolean drawLore     = exportMode || !tabsActive || TabState.activeTab() == TabState.Tab.LORE;
-        boolean drawForge    = !exportMode && (!tabsActive || TabState.activeTab() == TabState.Tab.FORGE);
-        boolean drawStats    = !exportMode && (!tabsActive || TabState.activeTab() == TabState.Tab.STATS);
-        boolean drawAffixes  = !exportMode && (!tabsActive || TabState.activeTab() == TabState.Tab.AFFIXES);
+        TabState.Tab activeTab = previewMode
+                ? resolvePreviewTab(renderState.forcedTab, availableTabs)
+                : TabState.activeTab();
+
+        SectionVisibility sections = SectionVisibility.of(exportMode, previewMode,
+                TooltipNavigationConfig.tooltipTabs(), availableTabs.size(), TabState.multiTab(), activeTab);
+
+        boolean tabsActive   = sections.tabsActive();
+        boolean drawLore     = sections.lore();
+        boolean drawForge    = sections.forge();
+        boolean drawStats    = sections.stats();
+        boolean drawAffixes  = sections.affixes();
 
         // ---- Layout ----
         int lineHeight  = tr.fontHeight + lineSpacing();
@@ -511,9 +533,9 @@ public class TooltipRenderer {
         // Panel position (with screen-edge clamping)
         int panelX;
         int panelY;
-        if (exportMode) {
-            panelX = exportState.margin;
-            panelY = exportState.margin;
+        if (overrideMode) {
+            panelX = renderState.originX != null ? renderState.originX : renderState.margin;
+            panelY = renderState.originY != null ? renderState.originY : renderState.margin;
         } else {
             panelX = x + 12;
             panelY = y - 12;
@@ -527,7 +549,7 @@ public class TooltipRenderer {
         final int MAX_BODY_H   = Math.min(
                 screenH - headerH - footerH - (hasBodyContent ? separatorH : 0) - 24,
                 maxBodyH());
-        final boolean scrollActive = !exportMode
+        final boolean scrollActive = !overrideMode
                 && TooltipNavigationConfig.scrollableTooltip()
                 && bodyH > MAX_BODY_H;
         final int clampedBodyH = scrollActive ? MAX_BODY_H : bodyH;
@@ -538,9 +560,9 @@ public class TooltipRenderer {
             if (panelY < 6) panelY = 6;
         }
 
-        if (exportMode) {
-            exportState.recordPanel(panelW, panelH);
-            if (exportState.measureOnly) {
+        if (overrideMode) {
+            renderState.recordPanel(panelW, panelH);
+            if (renderState.measureOnly) {
                 context.getMatrices().pop();
                 return;
             }
@@ -550,7 +572,7 @@ public class TooltipRenderer {
         TooltipPainter.drawGradientBackground(context, panelX, panelY, panelW, panelH, theme);
 
         BackgroundMotif motif = MotifRegistry.get(resolvedMotifKey);
-        long renderTimeMs = exportMode ? exportState.absoluteTimeMs : System.currentTimeMillis();
+        long renderTimeMs = overrideMode ? renderState.absoluteTimeMs : System.currentTimeMillis();
         if (motif != null) motif.draw(context, panelX, panelY, panelW, panelH, renderTimeMs);
 
         BorderRenderer.drawDecorativeBorder(context, panelX, panelY, panelW, panelH, theme, borderDef);
@@ -608,7 +630,7 @@ public class TooltipRenderer {
         context.drawItem(stack, 0, 0);
         context.getMatrices().pop();
         TooltipPainter.drawItemFrameProgressLabel(context, tr, model.itemFrameProgress(),
-                iconFrameX + 26, iconFrameY - 2, tooltipElapsedMs);
+                iconFrameX + 26, iconFrameY - 2, tooltipElapsedMs, theme.textShadow());
 
         // ---- Header: title + badges ----
         int nameX = panelX + padding() + iconAreaW;
@@ -631,24 +653,24 @@ public class TooltipRenderer {
             context.getMatrices().translate(-nameX, -nameY, 0);
         }
         switch (titleAnimStyle != null ? titleAnimStyle : "wave") {
-            case "shimmer" -> TooltipPainter.drawShimmerText(context, tr, displayTitle, nameX, nameY, theme.name(), iconTimeMs);
-            case "pulse"   -> TooltipPainter.drawPulseText(context, tr, displayTitle, nameX, nameY, theme.name(), iconTimeMs);
-            case "flicker" -> TooltipPainter.drawFlickerText(context, tr, displayTitle, nameX, nameY, theme.name(), iconTimeMs);
-            case "shiver", "shivering" -> TooltipPainter.drawShiverText(context, tr, displayTitle, nameX, nameY, theme.name(), iconTimeMs);
-            case "quiver"  -> TooltipPainter.drawQuiverText(context, tr, displayTitle, nameX, nameY, theme.name(), iconTimeMs);
-            case "breathe_spin_bob" -> TooltipPainter.drawBreatheSpinBobText(context, tr, displayTitle, nameX, nameY, theme.name(), iconTimeMs);
-            case "drop_bounce" -> TooltipPainter.drawDropBounceText(context, tr, displayTitle, nameX, nameY, theme.name(), tooltipElapsedMs);
+            case "shimmer" -> TooltipPainter.drawShimmerText(context, tr, displayTitle, nameX, nameY, theme.name(), iconTimeMs, theme.textShadow());
+            case "pulse"   -> TooltipPainter.drawPulseText(context, tr, displayTitle, nameX, nameY, theme.name(), iconTimeMs, theme.textShadow());
+            case "flicker" -> TooltipPainter.drawFlickerText(context, tr, displayTitle, nameX, nameY, theme.name(), iconTimeMs, theme.textShadow());
+            case "shiver", "shivering" -> TooltipPainter.drawShiverText(context, tr, displayTitle, nameX, nameY, theme.name(), iconTimeMs, theme.textShadow());
+            case "quiver"  -> TooltipPainter.drawQuiverText(context, tr, displayTitle, nameX, nameY, theme.name(), iconTimeMs, theme.textShadow());
+            case "breathe_spin_bob" -> TooltipPainter.drawBreatheSpinBobText(context, tr, displayTitle, nameX, nameY, theme.name(), iconTimeMs, theme.textShadow());
+            case "drop_bounce" -> TooltipPainter.drawDropBounceText(context, tr, displayTitle, nameX, nameY, theme.name(), tooltipElapsedMs, theme.textShadow());
             case "hinge_fall" -> {
                 // Clip title animation to tooltip bounds so off-panel motion stays hidden.
-                if (!exportMode) context.enableScissor(panelX + 1, panelY + 1, panelX + panelW - 1, panelY + panelH - 1);
-                TooltipPainter.drawHingeFallText(context, tr, displayTitle, nameX, nameY, theme.name(), tooltipElapsedMs);
-                if (!exportMode) context.disableScissor();
+                if (!overrideMode) context.enableScissor(panelX + 1, panelY + 1, panelX + panelW - 1, panelY + panelH - 1);
+                TooltipPainter.drawHingeFallText(context, tr, displayTitle, nameX, nameY, theme.name(), tooltipElapsedMs, theme.textShadow());
+                if (!overrideMode) context.disableScissor();
             }
-            case "obfuscate" -> TooltipPainter.drawObfuscateText(context, tr, displayTitle, nameX, nameY, theme.name(), tooltipElapsedMs);
+            case "obfuscate" -> TooltipPainter.drawObfuscateText(context, tr, displayTitle, nameX, nameY, theme.name(), tooltipElapsedMs, theme.textShadow());
             case "static"  -> context.drawText(tr, Text.literal(displayTitle).setStyle(
                                   Style.EMPTY.withColor(TextColor.fromRgb(theme.name() & 0x00FFFFFF))),
-                                  nameX, nameY, theme.name(), true);
-            default        -> TooltipPainter.drawWaveText(context, tr, displayTitle, nameX, nameY, theme.name(), iconTimeMs);
+                                  nameX, nameY, theme.name(), theme.textShadow());
+            default        -> TooltipPainter.drawWaveText(context, tr, displayTitle, nameX, nameY, theme.name(), iconTimeMs, theme.textShadow());
         }
         if (titleScale < 1.0f) context.getMatrices().pop();
 
@@ -716,7 +738,7 @@ public class TooltipRenderer {
             context.drawText(tr,
                     Text.literal("\u25C6 " + abilitySection.header()).setStyle(Style.EMPTY.withColor(
                             TextColor.fromRgb(theme.sectionHeader() & 0x00FFFFFF))),
-                    panelX + padding(), cursorY, theme.sectionHeader(), true);
+                    panelX + padding(), cursorY, theme.sectionHeader(), theme.textShadow());
             cursorY += lineHeight + sectionGap;
             boolean sawAbilityContent = false;
             for (String line : wrappedAbility) {
@@ -730,14 +752,14 @@ public class TooltipRenderer {
                     context.drawText(tr,
                             Text.literal(headerText).setStyle(Style.EMPTY.withColor(
                                     TextColor.fromRgb(theme.sectionHeader() & 0x00FFFFFF))),
-                            panelX + padding(), cursorY, theme.sectionHeader(), true);
+                            panelX + padding(), cursorY, theme.sectionHeader(), theme.textShadow());
                     cursorY += lineHeight + sectionGap;
                 } else {
                     int lineColor = isCooldownLine(line) ? COOLDOWN_TEXT_COLOR : theme.body();
                     context.drawText(tr,
                             Text.literal(line).setStyle(Style.EMPTY.withColor(
                                     TextColor.fromRgb(lineColor & 0x00FFFFFF))),
-                            panelX + padding(), cursorY, lineColor, true);
+                            panelX + padding(), cursorY, lineColor, theme.textShadow());
                     cursorY += lineHeight;
                     if (!line.trim().isEmpty()) {
                         sawAbilityContent = true;
@@ -756,7 +778,7 @@ public class TooltipRenderer {
                 context.drawText(tr,
                         Text.literal(line).setStyle(Style.EMPTY.withColor(
                                 TextColor.fromRgb(theme.body() & 0x00FFFFFF))),
-                        panelX + padding(), cursorY, theme.body(), true);
+                        panelX + padding(), cursorY, theme.body(), theme.textShadow());
                 cursorY += lineHeight;
             }
         }
@@ -773,7 +795,7 @@ public class TooltipRenderer {
             context.drawText(tr,
                     Text.literal("\u25C6 Upgrades").setStyle(Style.EMPTY.withColor(
                             TextColor.fromRgb(theme.sectionHeader() & 0x00FFFFFF))),
-                    leftX, cursorY, theme.sectionHeader(), true);
+                    leftX, cursorY, theme.sectionHeader(), theme.textShadow());
             cursorY += lineHeight + sectionGap;
 
             int pipSequenceBase = 0;
@@ -879,7 +901,7 @@ public class TooltipRenderer {
             context.drawText(tr,
                     Text.literal("\u25C6 Rune").setStyle(Style.EMPTY.withColor(
                             TextColor.fromRgb(theme.sectionHeader() & 0x00FFFFFF))),
-                    leftX, cursorY, theme.sectionHeader(), true);
+                    leftX, cursorY, theme.sectionHeader(), theme.textShadow());
             cursorY += lineHeight + sectionGap;
 
             context.drawText(tr,
@@ -924,7 +946,7 @@ public class TooltipRenderer {
                     context.drawText(tr,
                             Text.literal(headerText).setStyle(Style.EMPTY.withColor(
                                     TextColor.fromRgb(theme.sectionHeader() & 0x00FFFFFF))),
-                            contentLeft, cursorY, theme.sectionHeader(), true);
+                            contentLeft, cursorY, theme.sectionHeader(), theme.textShadow());
                     cursorY += lineHeight + sectionGap;
                 } else {
                     InlineStatRow stat = bodyStats.get(i);
@@ -932,7 +954,8 @@ public class TooltipRenderer {
                         drawInlineStatRow(context, tr, stat, contentLeft, contentRight, cursorY, theme, statValueColumnW);
                     } else {
                         drawTextWithHighlightedNumbers(context, tr, line,
-                                contentLeft, cursorY, theme.body(), theme.sectionHeader());
+                                contentLeft, cursorY, theme.body(), theme.sectionHeader(),
+                                theme.textShadow());
                     }
                     cursorY += statRowHeight(stat, lineHeight) + BODY_LINE_EXTRA_GAP;
                 }
@@ -955,7 +978,8 @@ public class TooltipRenderer {
                     drawInlineStatRow(context, tr, stat, contentLeft, contentRight, cursorY, theme, statValueColumnW);
                 } else {
                     drawTextWithHighlightedNumbers(context, tr, line,
-                            contentLeft, cursorY, extraColor, theme.sectionHeader());
+                            contentLeft, cursorY, extraColor, theme.sectionHeader(),
+                            theme.textShadow());
                 }
                 cursorY += statRowHeight(stat, lineHeight) + BODY_LINE_EXTRA_GAP;
             }
@@ -984,7 +1008,7 @@ public class TooltipRenderer {
                     context.drawText(tr,
                             Text.literal(headerText).setStyle(Style.EMPTY.withColor(
                                     TextColor.fromRgb(theme.sectionHeader() & 0x00FFFFFF))),
-                            contentLeft, cursorY, theme.sectionHeader(), true);
+                            contentLeft, cursorY, theme.sectionHeader(), theme.textShadow());
                     cursorY += lineHeight + sectionGap;
                 } else if (line.equals(ModernTooltipModel.AFFIX_DIVIDER)) {
                     pendingLeadingRomanColor = 0;
@@ -1022,7 +1046,7 @@ public class TooltipRenderer {
                             && wrappedAffixes.get(i + 1).equals(ModernTooltipModel.AFFIX_DIVIDER);
                     pendingLeadingRomanColor = drawAffixTextWithHighlights(context, tr, line,
                             contentLeft, cursorY, lineBaseColor, lineNumberColor,
-                            pendingLeadingRomanColor, altDown);
+                            pendingLeadingRomanColor, altDown, theme.textShadow());
                     cursorY += lineHeight + (nextIsDivider ? 0 : BODY_LINE_EXTRA_GAP);
                     if (!line.trim().isEmpty()) sawAffixContent = true;
                 }
@@ -1041,13 +1065,13 @@ public class TooltipRenderer {
         if (tabsActive) {
             String cycleTabKey = TooltipKeybinds.CYCLE_TAB.getBoundKeyLocalizedText().getString();
             TooltipPainter.drawTabDotsWithKeyHint(context, tr, panelX + panelW / 2, panelY + panelH - 8,
-                    TabState.tabs(), TabState.activeTab(), theme, cycleTabKey);
+                    previewMode ? availableTabs : TabState.tabs(), activeTab, theme, cycleTabKey);
         } else {
             TooltipPainter.drawFooterDots(context, panelX + panelW / 2, panelY + panelH - 8, theme);
         }
 
         // Record whether this frame had an active scroll region (used by MOUSE_SCROLLED to consume the event).
-        if (!exportMode) {
+        if (!overrideMode) {
             ScrollState.setScrollableActive(scrollActive);
             TooltipGifRecorder.markTooltipRendered(panelX, panelY, panelW, panelH);
         }
@@ -1104,6 +1128,13 @@ public class TooltipRenderer {
         // 5. Rarity fallback
         Rarity rarity = stack.getRarity();
         return ThemeRegistry.get(rarityThemeKey(rarity != null ? rarity : Rarity.COMMON));
+    }
+
+    /** Falls back to the first available tab when the screen's choice is stale or unset. */
+    private static TabState.Tab resolvePreviewTab(TabState.Tab forced, List<TabState.Tab> available) {
+        if (available.isEmpty()) return TabState.Tab.STATS;
+        if (forced != null && available.contains(forced)) return forced;
+        return available.get(0);
     }
 
     /** Maps a vanilla {@link Rarity} to the corresponding rarity theme key. */
@@ -1284,11 +1315,11 @@ public class TooltipRenderer {
         context.drawText(tr,
                 Text.literal(stat.label()).setStyle(Style.EMPTY.withColor(
                         TextColor.fromRgb(theme.body() & 0x00FFFFFF))),
-                contentLeft, y, theme.body(), true);
+                contentLeft, y, theme.body(), theme.textShadow());
         context.drawText(tr,
                 Text.literal(valueText).setStyle(Style.EMPTY.withColor(
                         TextColor.fromRgb(theme.sectionHeader() & 0x00FFFFFF))),
-                valueX, y, theme.sectionHeader(), true);
+                valueX, y, theme.sectionHeader(), theme.textShadow());
 
         int barStart = contentLeft + labelColumnW + 8;
         int barEnd = (contentRight - valueColumnW) - 8;
@@ -1460,9 +1491,10 @@ public class TooltipRenderer {
      */
     private static void drawTextWithHighlightedNumbers(DrawContext context, TextRenderer tr,
                                                        String text, int x, int y,
-                                                       int baseColor, int numberColor) {
+                                                       int baseColor, int numberColor,
+                                                       boolean shadow) {
         drawTextRangeWithNumberHighlight(context, tr, text, 0, text != null ? text.length() : 0,
-                x, y, baseColor, numberColor);
+                x, y, baseColor, numberColor, shadow);
     }
 
     private static boolean isSocketsSectionTitle(String sectionTitle) {
@@ -1479,7 +1511,8 @@ public class TooltipRenderer {
                                                     String text, int x, int y,
                                                     int baseColor, int numberColor,
                                                     int carryLeadingRomanColor,
-                                                    boolean showBracketedText) {
+                                                    boolean showBracketedText,
+                                                    boolean shadow) {
         if (text == null || text.isEmpty()) return 0;
 
         int len = text.length();
@@ -1520,7 +1553,7 @@ public class TooltipRenderer {
         for (int i = 0; i < len; i++) {
             if (hidden[i]) {
                 if (segStart >= 0) {
-                    curX = drawTextSegment(context, tr, text.substring(segStart, i), curX, y, segColor);
+                    curX = drawTextSegment(context, tr, text.substring(segStart, i), curX, y, segColor, shadow);
                     segStart = -1;
                 }
                 continue;
@@ -1530,13 +1563,13 @@ public class TooltipRenderer {
                 segStart = i;
                 segColor = colors[i];
             } else if (colors[i] != segColor) {
-                curX = drawTextSegment(context, tr, text.substring(segStart, i), curX, y, segColor);
+                curX = drawTextSegment(context, tr, text.substring(segStart, i), curX, y, segColor, shadow);
                 segStart = i;
                 segColor = colors[i];
             }
         }
         if (segStart >= 0) {
-            drawTextSegment(context, tr, text.substring(segStart), curX, y, segColor);
+            drawTextSegment(context, tr, text.substring(segStart), curX, y, segColor, shadow);
         }
         return trailingEffectColor(text);
     }
@@ -1544,7 +1577,8 @@ public class TooltipRenderer {
     private static int drawTextRangeWithNumberHighlight(DrawContext context, TextRenderer tr,
                                                          String text, int start, int end,
                                                          int x, int y,
-                                                         int baseColor, int numberColor) {
+                                                         int baseColor, int numberColor,
+                                                         boolean shadow) {
         if (text == null || start >= end) return x;
 
         String segment = text.substring(start, end);
@@ -1554,22 +1588,22 @@ public class TooltipRenderer {
 
         while (m.find()) {
             if (m.start() > lastEnd) {
-                curX = drawTextSegment(context, tr, segment.substring(lastEnd, m.start()), curX, y, baseColor);
+                curX = drawTextSegment(context, tr, segment.substring(lastEnd, m.start()), curX, y, baseColor, shadow);
             }
-            curX = drawTextSegment(context, tr, m.group(1), curX, y, numberColor);
+            curX = drawTextSegment(context, tr, m.group(1), curX, y, numberColor, shadow);
             lastEnd = m.end();
         }
 
         if (lastEnd < segment.length()) {
-            curX = drawTextSegment(context, tr, segment.substring(lastEnd), curX, y, baseColor);
+            curX = drawTextSegment(context, tr, segment.substring(lastEnd), curX, y, baseColor, shadow);
         }
 
         return curX;
     }
 
-    private static int drawTextSegment(DrawContext context, TextRenderer tr, String seg, int x, int y, int color) {
+    private static int drawTextSegment(DrawContext context, TextRenderer tr, String seg, int x, int y, int color, boolean shadow) {
         if (seg == null || seg.isEmpty()) return x;
-        context.drawText(tr, Text.literal(seg), x, y, color, true);
+        context.drawText(tr, Text.literal(seg), x, y, color, shadow);
         return x + tr.getWidth(seg);
     }
 
@@ -1738,6 +1772,10 @@ public class TooltipRenderer {
         final List<Text> rawLines;
         final boolean   altDown;
         final int       maxW;
+        // Compared by identity: every Studio edit yields a fresh record, so the cache drops
+        // naturally, while the hover path keeps null on both sides and never rebuilds.
+        final ThemeDefinition forcedDef;
+        final List<String> forcedBadges;
 
         // --- Cached results ---
         final ModernTooltipModel model;
@@ -1761,6 +1799,7 @@ public class TooltipRenderer {
         final int                 statValueColumnW;
 
         ModelBuildCache(ItemStack stack, List<Text> rawLines, boolean altDown, int maxW,
+                        ThemeDefinition forcedDef, List<String> forcedBadges,
                         ModernTooltipModel model, ThemeDefinition resolvedDef,
                         BorderDefinition borderDef, String resolvedMotifKey,
                         String itemAnimStyle, String titleAnimStyle, String itemBorderShape,
@@ -1774,6 +1813,8 @@ public class TooltipRenderer {
             this.rawLines         = rawLines;
             this.altDown          = altDown;
             this.maxW             = maxW;
+            this.forcedDef        = forcedDef;
+            this.forcedBadges     = forcedBadges;
             this.model            = model;
             this.resolvedDef      = resolvedDef;
             this.borderDef        = borderDef;

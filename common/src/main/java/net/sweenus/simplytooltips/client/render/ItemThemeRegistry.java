@@ -16,6 +16,7 @@ import net.minecraft.resource.ResourceManager;
 import net.minecraft.util.Identifier;
 import net.sweenus.simplytooltips.SimplyTooltips;
 import net.sweenus.simplytooltips.client.tooltip.NativeComponentFilter;
+import net.sweenus.simplytooltips.client.studio.UserDataStore;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.InputStreamReader;
@@ -83,6 +84,9 @@ public final class ItemThemeRegistry {
 
     /** Ordered tag → (theme key?, border key?, badge list?) entries.  First match wins at resolve time. */
     private static final List<TagEntry> TAG_ENTRIES = new ArrayList<>();
+
+    /** Resource-pack mapping documents, kept so the user overlay can be reapplied without a reload. */
+    private static final List<JsonObject> PACK_FILES = new ArrayList<>();
 
     // -------------------------------------------------------------------------
     // Public API
@@ -229,14 +233,7 @@ public final class ItemThemeRegistry {
      * rebuilds the internal maps.  Safe to call repeatedly (clears maps first).
      */
     public static void loadAll(ResourceManager manager) {
-        ITEM_THEMES.clear();
-        ITEM_BADGES.clear();
-        ITEM_BORDERS.clear();
-        ITEM_ENABLED.clear();
-        NAMESPACE_ENABLED.clear();
-        TOOLTIP_COMPONENT_ENABLED.clear();
-        COMPONENT_ENTRIES.clear();
-        TAG_ENTRIES.clear();
+        PACK_FILES.clear();
 
         Map<Identifier, net.minecraft.resource.Resource> resources = manager.findResources(
                 "item_themes",
@@ -246,118 +243,41 @@ public final class ItemThemeRegistry {
         for (Map.Entry<Identifier, net.minecraft.resource.Resource> entry : resources.entrySet()) {
             try (InputStreamReader reader = new InputStreamReader(entry.getValue().getInputStream())) {
                 JsonObject json = GSON.fromJson(reader, JsonObject.class);
-                if (json == null) continue;
-
-                // --- "items" section ---
-                // Each value is either a plain theme-key string or an object:
-                //   { "enabled": false, "theme": "optional_key", "border": "optional_key", "badges": ["A", "B"] }
-                if (json.has("items") && json.get("items").isJsonObject()) {
-                    for (Map.Entry<String, JsonElement> itemEntry
-                            : json.getAsJsonObject("items").entrySet()) {
-
-                        Identifier itemId = Identifier.tryParse(itemEntry.getKey());
-                        if (itemId == null) continue;
-
-                        JsonElement val = itemEntry.getValue();
-                        if (val.isJsonPrimitive()) {
-                            // Plain string → theme key only
-                            String themeKey = readString(val);
-                            if (themeKey != null) ITEM_THEMES.put(itemId, themeKey);
-                        } else if (val.isJsonObject()) {
-                            JsonObject obj = val.getAsJsonObject();
-                            String themeKey = readString(obj.get("theme"));
-                            if (themeKey != null) ITEM_THEMES.put(itemId, themeKey);
-                            String itemBorder = parseBorderKey(obj);
-                            if (itemBorder != null) {
-                                ITEM_BORDERS.put(itemId, itemBorder);
-                            }
-                            List<String> badges = parseBadgeArray(obj);
-                            if (badges != null) {
-                                ITEM_BADGES.put(itemId, badges);
-                            }
-                            Boolean enabled = readBoolean(obj.get("enabled"));
-                            if (enabled != null) ITEM_ENABLED.put(itemId, enabled);
-                        }
-                    }
-                }
-
-                // --- "namespaces" section ---
-                // Each value is an object: { "enabled": false }.
-                // Exact item eligibility overrides a namespace rule.
-                if (json.has("namespaces") && json.get("namespaces").isJsonObject()) {
-                    for (Map.Entry<String, JsonElement> namespaceEntry
-                            : json.getAsJsonObject("namespaces").entrySet()) {
-                        String namespace = namespaceEntry.getKey();
-                        JsonElement val = namespaceEntry.getValue();
-                        if (!isValidNamespace(namespace) || !val.isJsonObject()) continue;
-
-                        Boolean enabled = readBoolean(val.getAsJsonObject().get("enabled"));
-                        if (enabled != null) NAMESPACE_ENABLED.put(namespace, enabled);
-                    }
-                }
-
-                // --- "tooltip_components" section ---
-                // Blacklist for native tooltip components other mods contribute, keyed by
-                // implementation class name (exact, or a package prefix ending in '.' or '*'):
-                //   { "com.example.tooltip.*": { "enabled": false } }
-                // Distinct from the "components" array below, which matches item DataComponents.
-                if (json.has("tooltip_components") && json.get("tooltip_components").isJsonObject()) {
-                    for (Map.Entry<String, JsonElement> componentEntry
-                            : json.getAsJsonObject("tooltip_components").entrySet()) {
-                        String pattern = componentEntry.getKey();
-                        JsonElement val = componentEntry.getValue();
-                        if (!isValidClassPattern(pattern) || !val.isJsonObject()) continue;
-
-                        Boolean enabled = readBoolean(val.getAsJsonObject().get("enabled"));
-                        if (enabled != null) TOOLTIP_COMPONENT_ENABLED.put(pattern, enabled);
-                    }
-                }
-
-                // --- "components" section ---
-                // Each entry:
-                //   { "component": "ns:id", "value": "optional_value", "theme": "optional_key",
-                //     "border": "optional_key", "badges": ["A"] }
-                // Shorthand is also supported:
-                //   { "component": "ns:id=optional_value", "theme": "optional_key" }
-                if (json.has("components") && json.get("components").isJsonArray()) {
-                    for (JsonElement el : json.getAsJsonArray("components")) {
-                        if (!el.isJsonObject()) continue;
-                        JsonObject componentObj = el.getAsJsonObject();
-                        ComponentEntry componentEntry = parseComponentEntry(componentObj);
-                        if (componentEntry != null) {
-                            COMPONENT_ENTRIES.add(componentEntry);
-                        }
-                    }
-                }
-
-                // --- "tags" section ---
-                // Each entry: { "tag": "ns:id", "theme": "optional_key", "border": "optional_key", "badges": ["A"] }
-                if (json.has("tags") && json.get("tags").isJsonArray()) {
-                    for (JsonElement el : json.getAsJsonArray("tags")) {
-                        if (!el.isJsonObject()) continue;
-                        JsonObject tagObj = el.getAsJsonObject();
-                        String tagText = readString(tagObj.get("tag"));
-                        if (tagText == null) continue;
-
-                        Identifier tagId = Identifier.tryParse(tagText);
-                        if (tagId == null) continue;
-
-                        String themeKey = readString(tagObj.get("theme"));
-                        String borderKey = parseBorderKey(tagObj);
-                        List<String> badges = parseBadgeArray(tagObj);
-
-                        if (themeKey != null || borderKey != null || badges != null) {
-                            TAG_ENTRIES.add(new TagEntry(
-                                    TagKey.of(RegistryKeys.ITEM, tagId), themeKey, borderKey, badges));
-                        }
-                    }
-                }
-
+                if (json != null) PACK_FILES.add(json);
             } catch (Exception e) {
                 SimplyTooltips.LOGGER.error("[SimplyTooltips] Failed to load item_themes '{}': {}",
                         entry.getKey(), e.getMessage());
             }
         }
+
+        rebuild();
+    }
+
+    /**
+     * Re-reads {@code config/simplytooltips/item_themes/} and reapplies it over the resource-pack
+     * rules, without needing a {@link ResourceManager}. Called after the Studio saves a mapping.
+     */
+    public static void reloadUser() {
+        rebuild();
+    }
+
+    /**
+     * Rebuilds every map from the cached resource-pack files, then the player's own files on top.
+     * User files are ingested last so their {@code items} entries win, which is what makes a
+     * Studio assignment override the shipped {@code defaults.json}.
+     */
+    private static void rebuild() {
+        ITEM_THEMES.clear();
+        ITEM_BADGES.clear();
+        ITEM_BORDERS.clear();
+        ITEM_ENABLED.clear();
+        NAMESPACE_ENABLED.clear();
+        TOOLTIP_COMPONENT_ENABLED.clear();
+        COMPONENT_ENTRIES.clear();
+        TAG_ENTRIES.clear();
+
+        for (JsonObject json : PACK_FILES) safeIngest(json);
+        for (JsonObject json : UserDataStore.loadItemThemeFiles()) safeIngest(json);
 
         NativeComponentFilter.setRules(TOOLTIP_COMPONENT_ENABLED);
 
@@ -365,6 +285,123 @@ public final class ItemThemeRegistry {
                 ITEM_THEMES.size(), ITEM_BADGES.size(), ITEM_BORDERS.size(),
                 ITEM_ENABLED.size(), NAMESPACE_ENABLED.size(), TOOLTIP_COMPONENT_ENABLED.size(),
                 COMPONENT_ENTRIES.size(), TAG_ENTRIES.size());
+    }
+
+    private static void safeIngest(JsonObject json) {
+        try {
+            ingest(json);
+        } catch (Exception e) {
+            SimplyTooltips.LOGGER.error("[SimplyTooltips] Failed to apply item_themes entry: {}", e.getMessage());
+        }
+    }
+
+    /** Merges one item-mapping JSON document into the maps. */
+    private static void ingest(JsonObject json) {
+
+            // --- "items" section ---
+            // Each value is either a plain theme-key string or an object:
+            //   { "enabled": false, "theme": "optional_key", "border": "optional_key", "badges": ["A", "B"] }
+            if (json.has("items") && json.get("items").isJsonObject()) {
+                for (Map.Entry<String, JsonElement> itemEntry
+                        : json.getAsJsonObject("items").entrySet()) {
+
+                    Identifier itemId = Identifier.tryParse(itemEntry.getKey());
+                    if (itemId == null) continue;
+
+                    JsonElement val = itemEntry.getValue();
+                    if (val.isJsonPrimitive()) {
+                        // Plain string → theme key only
+                        String themeKey = readString(val);
+                        if (themeKey != null) ITEM_THEMES.put(itemId, themeKey);
+                    } else if (val.isJsonObject()) {
+                        JsonObject obj = val.getAsJsonObject();
+                        String themeKey = readString(obj.get("theme"));
+                        if (themeKey != null) ITEM_THEMES.put(itemId, themeKey);
+                        String itemBorder = parseBorderKey(obj);
+                        if (itemBorder != null) {
+                            ITEM_BORDERS.put(itemId, itemBorder);
+                        }
+                        List<String> badges = parseBadgeArray(obj);
+                        if (badges != null) {
+                            ITEM_BADGES.put(itemId, badges);
+                        }
+                        Boolean enabled = readBoolean(obj.get("enabled"));
+                        if (enabled != null) ITEM_ENABLED.put(itemId, enabled);
+                    }
+                }
+            }
+
+            // --- "namespaces" section ---
+            // Each value is an object: { "enabled": false }.
+            // Exact item eligibility overrides a namespace rule.
+            if (json.has("namespaces") && json.get("namespaces").isJsonObject()) {
+                for (Map.Entry<String, JsonElement> namespaceEntry
+                        : json.getAsJsonObject("namespaces").entrySet()) {
+                    String namespace = namespaceEntry.getKey();
+                    JsonElement val = namespaceEntry.getValue();
+                    if (!isValidNamespace(namespace) || !val.isJsonObject()) continue;
+
+                    Boolean enabled = readBoolean(val.getAsJsonObject().get("enabled"));
+                    if (enabled != null) NAMESPACE_ENABLED.put(namespace, enabled);
+                }
+            }
+
+            // --- "tooltip_components" section ---
+            // Blacklist for native tooltip components other mods contribute, keyed by
+            // implementation class name (exact, or a package prefix ending in '.' or '*'):
+            //   { "com.example.tooltip.*": { "enabled": false } }
+            // Distinct from the "components" array below, which matches item DataComponents.
+            if (json.has("tooltip_components") && json.get("tooltip_components").isJsonObject()) {
+                for (Map.Entry<String, JsonElement> componentEntry
+                        : json.getAsJsonObject("tooltip_components").entrySet()) {
+                    String pattern = componentEntry.getKey();
+                    JsonElement val = componentEntry.getValue();
+                    if (!isValidClassPattern(pattern) || !val.isJsonObject()) continue;
+
+                    Boolean enabled = readBoolean(val.getAsJsonObject().get("enabled"));
+                    if (enabled != null) TOOLTIP_COMPONENT_ENABLED.put(pattern, enabled);
+                }
+            }
+
+            // --- "components" section ---
+            // Each entry:
+            //   { "component": "ns:id", "value": "optional_value", "theme": "optional_key",
+            //     "border": "optional_key", "badges": ["A"] }
+            // Shorthand is also supported:
+            //   { "component": "ns:id=optional_value", "theme": "optional_key" }
+            if (json.has("components") && json.get("components").isJsonArray()) {
+                for (JsonElement el : json.getAsJsonArray("components")) {
+                    if (!el.isJsonObject()) continue;
+                    JsonObject componentObj = el.getAsJsonObject();
+                    ComponentEntry componentEntry = parseComponentEntry(componentObj);
+                    if (componentEntry != null) {
+                        COMPONENT_ENTRIES.add(componentEntry);
+                    }
+                }
+            }
+
+            // --- "tags" section ---
+            // Each entry: { "tag": "ns:id", "theme": "optional_key", "border": "optional_key", "badges": ["A"] }
+            if (json.has("tags") && json.get("tags").isJsonArray()) {
+                for (JsonElement el : json.getAsJsonArray("tags")) {
+                    if (!el.isJsonObject()) continue;
+                    JsonObject tagObj = el.getAsJsonObject();
+                    String tagText = readString(tagObj.get("tag"));
+                    if (tagText == null) continue;
+
+                    Identifier tagId = Identifier.tryParse(tagText);
+                    if (tagId == null) continue;
+
+                    String themeKey = readString(tagObj.get("theme"));
+                    String borderKey = parseBorderKey(tagObj);
+                    List<String> badges = parseBadgeArray(tagObj);
+
+                    if (themeKey != null || borderKey != null || badges != null) {
+                        TAG_ENTRIES.add(new TagEntry(
+                                TagKey.of(RegistryKeys.ITEM, tagId), themeKey, borderKey, badges));
+                    }
+                }
+            }
     }
 
     // -------------------------------------------------------------------------

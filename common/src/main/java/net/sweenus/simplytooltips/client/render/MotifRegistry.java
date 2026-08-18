@@ -46,6 +46,8 @@ public class MotifRegistry {
         MOTIFS.put("spectral",  new SpectralMotif());
         MOTIFS.put("radiant",   new RadiantMotif());
         MOTIFS.put("candle",    new CandleMotif());
+        MOTIFS.put("amethyst",  new AmethystMotif());
+        MOTIFS.put("tome",      new TomeMotif());
     }
 
     /**
@@ -60,6 +62,13 @@ public class MotifRegistry {
     /** Register a custom motif under the given key. */
     public static void register(String key, BackgroundMotif motif) {
         MOTIFS.put(key, motif);
+    }
+
+    /** Every registered motif key, sorted, for menus and validation. */
+    public static java.util.List<String> keys() {
+        java.util.List<String> keys = new java.util.ArrayList<>(MOTIFS.keySet());
+        java.util.Collections.sort(keys);
+        return java.util.Collections.unmodifiableList(keys);
     }
 
     private MotifRegistry() {}

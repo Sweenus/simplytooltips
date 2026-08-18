@@ -48,6 +48,8 @@ public class BorderRegistry {
         PATTERNS.put("spectral",  new SpectralBorder());
         PATTERNS.put("radiant",   new RadiantBorder());
         PATTERNS.put("candle",    new CandleBorder());
+        PATTERNS.put("amethyst",  new AmethystBorder());
+        PATTERNS.put("tome",      new TomeBorder());
     }
 
     /**
@@ -67,6 +69,13 @@ public class BorderRegistry {
     /** Register a custom border pattern under the given key. */
     public static void register(String key, BorderPattern pattern) {
         PATTERNS.put(key, pattern);
+    }
+
+    /** Every registered pattern key, sorted, for menus and validation. */
+    public static java.util.List<String> keys() {
+        java.util.List<String> keys = new java.util.ArrayList<>(PATTERNS.keySet());
+        java.util.Collections.sort(keys);
+        return java.util.Collections.unmodifiableList(keys);
     }
 
     private BorderRegistry() {}

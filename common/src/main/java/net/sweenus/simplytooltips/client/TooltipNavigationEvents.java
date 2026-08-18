@@ -13,6 +13,7 @@ import net.minecraft.client.gui.screen.ingame.BookEditScreen;
 import net.minecraft.client.gui.widget.EditBoxWidget;
 import net.minecraft.client.gui.widget.TextFieldWidget;
 import net.sweenus.simplytooltips.client.render.TabState;
+import net.sweenus.simplytooltips.client.studio.ThemeStudioScreen;
 import net.sweenus.simplytooltips.client.render.TooltipBatchExporter;
 import net.sweenus.simplytooltips.client.render.TooltipGifRecorder;
 import org.lwjgl.glfw.GLFW;
@@ -28,6 +29,8 @@ public class TooltipNavigationEvents {
      * Must be called during client initialisation on both platforms.
      */
     public static void register() {
+        TooltipCommands.register();
+
         // Mouse scroll is handled by ScreenScrollMixin, which intercepts Screen#mouseScrolled
         // directly. This is more reliable than Architectury's MOUSE_SCROLLED event for the
         // inventory-screen context on Fabric.
@@ -36,6 +39,10 @@ public class TooltipNavigationEvents {
         // when an inventory screen is open (wasPressed() only fires when currentScreen == null).
         ClientRawInputEvent.KEY_PRESSED.register((client, keyCode, scanCode, action, modifiers) -> {
             if (isTextInputScreen(client.currentScreen)) {
+                return EventResult.pass();
+            }
+
+            if (client.currentScreen instanceof ThemeStudioScreen) {
                 return EventResult.pass();
             }
 
