@@ -71,5 +71,12 @@ public class BorderRegistry {
         PATTERNS.put(key, pattern);
     }
 
+    /** Every registered pattern key, sorted, for menus and validation. */
+    public static java.util.List<String> keys() {
+        java.util.List<String> keys = new java.util.ArrayList<>(PATTERNS.keySet());
+        java.util.Collections.sort(keys);
+        return java.util.Collections.unmodifiableList(keys);
+    }
+
     private BorderRegistry() {}
 }

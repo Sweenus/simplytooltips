@@ -64,5 +64,12 @@ public class MotifRegistry {
         MOTIFS.put(key, motif);
     }
 
+    /** Every registered motif key, sorted, for menus and validation. */
+    public static java.util.List<String> keys() {
+        java.util.List<String> keys = new java.util.ArrayList<>(MOTIFS.keySet());
+        java.util.Collections.sort(keys);
+        return java.util.Collections.unmodifiableList(keys);
+    }
+
     private MotifRegistry() {}
 }

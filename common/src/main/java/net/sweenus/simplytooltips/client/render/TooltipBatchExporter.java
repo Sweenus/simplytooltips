@@ -170,9 +170,9 @@ public final class TooltipBatchExporter {
 
             VertexConsumerProvider.Immediate consumers = client.getBufferBuilders().getEntityVertexConsumers();
             DrawContext context = new DrawContext(client, consumers);
-            TooltipExportRenderState.State measure = new TooltipExportRenderState.State(
+            TooltipRenderState.State measure = new TooltipRenderState.State(
                     true, 0L, ANIMATION_TIME_BASE_MS, options.margin());
-            TooltipExportRenderState.run(measure, () -> TooltipRenderer.render(
+            TooltipRenderState.run(measure, () -> TooltipRenderer.render(
                     context, client.textRenderer, stack, rawLines, provider,
                     0, 0, 32_768, 32_768));
             canvasWidth = measure.canvasWidth;
@@ -219,9 +219,9 @@ public final class TooltipBatchExporter {
 
                 VertexConsumerProvider.Immediate consumers = client.getBufferBuilders().getEntityVertexConsumers();
                 DrawContext context = new DrawContext(client, consumers);
-                TooltipExportRenderState.State render = new TooltipExportRenderState.State(
+                TooltipRenderState.State render = new TooltipRenderState.State(
                         false, elapsedMs, ANIMATION_TIME_BASE_MS + elapsedMs, options.margin());
-                TooltipExportRenderState.run(render, () -> TooltipRenderer.render(
+                TooltipRenderState.run(render, () -> TooltipRenderer.render(
                         context, client.textRenderer, stack, rawLines, provider,
                         0, 0, canvasWidth, canvasHeight));
                 context.draw();

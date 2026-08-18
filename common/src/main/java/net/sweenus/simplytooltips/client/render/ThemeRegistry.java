@@ -9,12 +9,15 @@ import net.minecraft.util.Identifier;
 import net.sweenus.simplytooltips.SimplyTooltips;
 import net.sweenus.simplytooltips.api.ThemeDefinition;
 import net.sweenus.simplytooltips.api.TooltipTheme;
+import net.sweenus.simplytooltips.client.studio.UserDataStore;
 
 import java.io.InputStreamReader;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeSet;
 
 /**
  * Loads and caches {@link ThemeDefinition} instances from
@@ -22,25 +25,58 @@ import java.util.Map;
  *
  * <p>Call {@link #loadAll(ResourceManager)} from platform-specific reload listeners.
  * Resource packs can override or add themes by placing files at the same path.
+ *
+ * <p>Themes come from two places. Pack themes are read through the resource pipeline and are
+ * read-only. User themes are read from {@code config/simplytooltips/themes/} by
+ * {@link UserDataStore} and take priority over a pack theme with the same key, so the Theme Studio
+ * can save one without touching any resource pack.
  */
 public class ThemeRegistry {
 
     private static final Gson GSON = new Gson();
-    private static final Map<String, ThemeDefinition> THEMES = new HashMap<>();
+    private static final Map<String, ThemeDefinition> PACK = new HashMap<>();
+    private static final Map<String, ThemeDefinition> USER = new HashMap<>();
     private static final ThemeDefinition DEFAULT = ThemeDefinition.defaultDefinition();
 
     /**
      * Returns the {@link ThemeDefinition} for the given key, or the default definition
-     * (golden theme, no motif) if the key is not found.
+     * (golden theme, no motif) if the key is not found. User themes shadow pack themes.
      */
     public static ThemeDefinition get(String key) {
         if (key == null) return DEFAULT;
-        return THEMES.getOrDefault(key, DEFAULT);
+        ThemeDefinition user = USER.get(key);
+        if (user != null) return user;
+        return PACK.getOrDefault(key, DEFAULT);
     }
 
     /** The default theme colours (used as fallback in {@link #get(String)}). */
     public static TooltipTheme defaultColors() {
         return DEFAULT.colors();
+    }
+
+    /** Every known theme key, sorted, across both pack and user themes. */
+    public static List<String> keys() {
+        TreeSet<String> keys = new TreeSet<>(PACK.keySet());
+        keys.addAll(USER.keySet());
+        return Collections.unmodifiableList(new ArrayList<>(keys));
+    }
+
+    /** True if {@code key} names any known theme. */
+    public static boolean has(String key) {
+        return key != null && (USER.containsKey(key) || PACK.containsKey(key));
+    }
+
+    /**
+     * True if {@code key} comes from the mod jar or a resource pack. Such themes can be opened and
+     * copied but never overwritten in place — the Studio offers "save as new" for them instead.
+     */
+    public static boolean isBuiltIn(String key) {
+        return key != null && PACK.containsKey(key);
+    }
+
+    /** True if {@code key} is backed by an editable file in {@code config/simplytooltips/themes/}. */
+    public static boolean isUserTheme(String key) {
+        return key != null && USER.containsKey(key);
     }
 
     /**
@@ -52,7 +88,7 @@ public class ThemeRegistry {
      * (the "prepare" phase of the resource reload pipeline).
      */
     public static void loadAll(ResourceManager manager) {
-        THEMES.clear();
+        PACK.clear();
         Map<Identifier, net.minecraft.resource.Resource> resources = manager.findResources(
                 "themes",
                 id -> id.getNamespace().equals(SimplyTooltips.MOD_ID) && id.getPath().endsWith(".json")
@@ -66,31 +102,48 @@ public class ThemeRegistry {
             try (InputStreamReader reader = new InputStreamReader(entry.getValue().getInputStream())) {
                 JsonObject json = GSON.fromJson(reader, JsonObject.class);
                 if (json == null) continue;
-
-                TooltipTheme colors = TooltipTheme.fromJson(json);
-                String motif           = str(json, "motif",           "none");
-                // NB: "border" is already this file's frame *colour*, so the pattern selector is
-                // "borderStyle". It defaults to the motif key because before borders were their own
-                // concept the motif selected both. Themes without the field keep the border they had.
-                String border          = str(json, "borderStyle",     motif);
-                String itemAnimStyle   = str(json, "itemAnimStyle",   "breathe_spin_bob");
-                String titleAnimStyle  = str(json, "titleAnimStyle",  "wave");
-                String itemBorderShape = str(json, "itemBorderShape", "diamond");
-
-                List<String> customTextKeys = new ArrayList<>();
-                if (json.has("customTextKeys")) {
-                    JsonArray arr = json.getAsJsonArray("customTextKeys");
-                    for (JsonElement el : arr) customTextKeys.add(el.getAsString());
-                }
-
-                THEMES.put(key, new ThemeDefinition(colors, motif, border, itemAnimStyle,
-                        titleAnimStyle, itemBorderShape, customTextKeys));
+                PACK.put(key, parse(json));
             } catch (Exception e) {
                 SimplyTooltips.LOGGER.error("[SimplyTooltips] Failed to load theme '{}': {}", key, e.getMessage());
             }
         }
 
-        SimplyTooltips.LOGGER.info("[SimplyTooltips] Loaded {} theme(s)", THEMES.size());
+        // A resource reload clears everything, so the user overlay has to be re-applied or every
+        // Studio-authored theme would vanish on F3+T.
+        reloadUser();
+
+        SimplyTooltips.LOGGER.info("[SimplyTooltips] Loaded {} theme(s) ({} user)", PACK.size() + USER.size(), USER.size());
+    }
+
+    /** Re-reads {@code config/simplytooltips/themes/} without touching pack themes. */
+    public static void reloadUser() {
+        USER.clear();
+        USER.putAll(UserDataStore.loadThemes());
+    }
+
+    /**
+     * Parses one theme JSON object into a definition, applying the same defaults the loader uses.
+     * Shared with {@link UserDataStore} so config-folder themes behave identically to pack themes.
+     */
+    public static ThemeDefinition parse(JsonObject json) {
+        TooltipTheme colors = TooltipTheme.fromJson(json);
+        String motif           = str(json, "motif",           "none");
+        // NB: "border" is already this file's frame *colour*, so the pattern selector is
+        // "borderStyle". It defaults to the motif key because before borders were their own
+        // concept the motif selected both. Themes without the field keep the border they had.
+        String border          = str(json, "borderStyle",     motif);
+        String itemAnimStyle   = str(json, "itemAnimStyle",   "breathe_spin_bob");
+        String titleAnimStyle  = str(json, "titleAnimStyle",  "wave");
+        String itemBorderShape = str(json, "itemBorderShape", "diamond");
+
+        List<String> customTextKeys = new ArrayList<>();
+        if (json.has("customTextKeys")) {
+            JsonArray arr = json.getAsJsonArray("customTextKeys");
+            for (JsonElement el : arr) customTextKeys.add(el.getAsString());
+        }
+
+        return new ThemeDefinition(colors, motif, border, itemAnimStyle,
+                titleAnimStyle, itemBorderShape, customTextKeys);
     }
 
     private static String str(JsonObject json, String key, String fallback) {

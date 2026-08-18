@@ -117,6 +117,7 @@
     "simplyswords:wraithmaw":            { "theme": "corrupted_eye", "badges": ["UNIQUE", "CUTLASS"]  },
     "simplyswords:soulstalker":          { "theme": "corrupted_eye", "badges": ["UNIQUE", "SCYTHE"]   },
     "simplyswords:gloampiercer":         { "theme": "corrupted_eye", "badges": ["UNIQUE", "SPEAR"]    },
+    "simplyswords:dreadwhisper":         { "theme": "corrupted_eye", "badges": ["UNIQUE", "KATANA"]   },
 
     "simplyswords:contained_remnant":     { "theme": "autumn",         "badges": ["UPGRADE"] },
     "simplyswords:tampered_remnant":      { "theme": "obfuscated",     "badges": ["UPGRADE"] },

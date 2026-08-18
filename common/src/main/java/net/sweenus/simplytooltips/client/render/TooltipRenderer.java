@@ -122,13 +122,13 @@ public class TooltipRenderer {
         context.getMatrices().push();
         context.getMatrices().translate(0.0f, 0.0f, 400.0f);
 
-        TooltipExportRenderState.State exportState = TooltipExportRenderState.current();
-        boolean exportMode = exportState != null;
+        TooltipRenderState.State renderState = TooltipRenderState.current();
+        boolean overrideMode = renderState != null;
         List<TooltipComponent> gatheredNativeComponents = nativeComponents != null
                 ? nativeComponents : List.of();
 
         boolean altDown = false;
-        if (!exportMode) {
+        if (!overrideMode) {
             try { altDown = Screen.hasAltDown(); } catch (Throwable ignored) {}
         }
 
@@ -158,10 +158,15 @@ public class TooltipRenderer {
         final List<InlineStatRow> extraStats;
         final int                 statValueColumnW;
 
+        final ThemeDefinition forcedDef = overrideMode ? renderState.forcedDef : null;
+        final List<String> forcedBadges = overrideMode ? renderState.forcedBadges : null;
+
         if (mbc != null
                 && ItemStack.areEqual(mbc.stack, stack)
                 && mbc.altDown == altDown
                 && mbc.maxW    == currMaxW
+                && mbc.forcedDef == forcedDef
+                && mbc.forcedBadges == forcedBadges
                 && mbc.rawLines.equals(rawLines)) {
             // Cache hit — reuse everything from the previous frame.
             model             = mbc.model;
@@ -190,18 +195,23 @@ public class TooltipRenderer {
             builtModel  = ApotheosisCompat.augment(builtModel, rawLines, stack, altDown);
             model       = builtModel;
 
-            // Resolve theme via priority chain: component > item > provider > tag > rarity
-            ThemeDefinition builtDef = resolveTheme(stack, model);
+            // Resolve theme via priority chain: component > item > provider > tag > rarity,
+            // unless a preview has forced one.
+            ThemeDefinition builtDef = forcedDef != null ? forcedDef : resolveTheme(stack, model);
             resolvedDef  = builtDef;
             final String motifStr = resolvedDef.motif();
-            borderDef        = BorderDefinitionRegistry.resolve(resolveBorderKey(stack, resolvedDef));
+            String borderKey = forcedDef != null ? forcedDef.border() : resolveBorderKey(stack, resolvedDef);
+            borderDef        = BorderDefinitionRegistry.resolve(borderKey);
             resolvedMotifKey = "none".equals(motifStr) ? null : motifStr;
             itemAnimStyle    = resolvedDef.itemAnimStyle();
             titleAnimStyle   = resolvedDef.titleAnimStyle();
             itemBorderShape  = resolvedDef.itemBorderShape();
 
-            // Data-driven badge override: item_themes JSON can replace the provider's default badges
-            List<String> dataBadges = ItemThemeRegistry.resolveBadgesForStack(stack);
+            // Data-driven badge override: item_themes JSON can replace the provider's default badges,
+            // and a preview can override that again without touching the item's mapping.
+            List<String> dataBadges = forcedBadges != null
+                    ? forcedBadges
+                    : ItemThemeRegistry.resolveBadgesForStack(stack);
             // Providers may use ALT to deliberately replace the normal data-driven badges
             // with progress information (for example a weapon awakening level).
             badges = altDown && model.itemFrameProgress() != null
@@ -242,7 +252,7 @@ public class TooltipRenderer {
                     : List.of();
 
             modelBuildCache = new ModelBuildCache(
-                    stack, List.copyOf(rawLines), altDown, currMaxW,
+                    stack, List.copyOf(rawLines), altDown, currMaxW, forcedDef, forcedBadges,
                     model, resolvedDef, borderDef, resolvedMotifKey,
                     itemAnimStyle, titleAnimStyle, itemBorderShape,
                     badges, abilitySection,
@@ -257,16 +267,16 @@ public class TooltipRenderer {
                 .toList();
 
         final TooltipTheme theme = resolvedDef.colors();
-        long tooltipElapsedMs = exportMode
-                ? exportState.elapsedMs
+        long tooltipElapsedMs = overrideMode
+                ? renderState.elapsedMs
                 : TooltipAnimator.updateAndGetElapsed(stack, model.animKeyExtra());
 
         // ---- Tab and scroll state ----
         Identifier itemId = Registries.ITEM.getId(stack.getItem());
-        if (!exportMode) ScrollState.notifyItem(itemId);
+        if (!overrideMode) ScrollState.notifyItem(itemId);
 
         List<TabState.Tab> availableTabs = new ArrayList<>();
-        if (!exportMode && TooltipNavigationConfig.tooltipTabs()) {
+        if (!overrideMode && TooltipNavigationConfig.tooltipTabs()) {
             if (!wrappedAbility.isEmpty() || !wrappedCustom.isEmpty())        availableTabs.add(TabState.Tab.LORE);
             if (model.upgradeSection() != null)                               availableTabs.add(TabState.Tab.FORGE);
             if (!wrappedBody.isEmpty() || !wrappedExtra.isEmpty())            availableTabs.add(TabState.Tab.STATS);
@@ -274,11 +284,11 @@ public class TooltipRenderer {
             TabState.notifyItem(itemId, availableTabs);
         }
 
-        boolean tabsActive   = !exportMode && TooltipNavigationConfig.tooltipTabs() && TabState.multiTab();
-        boolean drawLore     = exportMode || !tabsActive || TabState.activeTab() == TabState.Tab.LORE;
-        boolean drawForge    = !exportMode && (!tabsActive || TabState.activeTab() == TabState.Tab.FORGE);
-        boolean drawStats    = !exportMode && (!tabsActive || TabState.activeTab() == TabState.Tab.STATS);
-        boolean drawAffixes  = !exportMode && (!tabsActive || TabState.activeTab() == TabState.Tab.AFFIXES);
+        boolean tabsActive   = !overrideMode && TooltipNavigationConfig.tooltipTabs() && TabState.multiTab();
+        boolean drawLore     = overrideMode || !tabsActive || TabState.activeTab() == TabState.Tab.LORE;
+        boolean drawForge    = !overrideMode && (!tabsActive || TabState.activeTab() == TabState.Tab.FORGE);
+        boolean drawStats    = !overrideMode && (!tabsActive || TabState.activeTab() == TabState.Tab.STATS);
+        boolean drawAffixes  = !overrideMode && (!tabsActive || TabState.activeTab() == TabState.Tab.AFFIXES);
 
         // ---- Layout ----
         int lineHeight  = tr.fontHeight + lineSpacing();
@@ -510,9 +520,9 @@ public class TooltipRenderer {
         // Panel position (with screen-edge clamping)
         int panelX;
         int panelY;
-        if (exportMode) {
-            panelX = exportState.margin;
-            panelY = exportState.margin;
+        if (overrideMode) {
+            panelX = renderState.originX != null ? renderState.originX : renderState.margin;
+            panelY = renderState.originY != null ? renderState.originY : renderState.margin;
         } else {
             panelX = x + 12;
             panelY = y - 12;
@@ -526,7 +536,7 @@ public class TooltipRenderer {
         final int MAX_BODY_H   = Math.min(
                 screenH - headerH - footerH - (hasBodyContent ? separatorH : 0) - 24,
                 maxBodyH());
-        final boolean scrollActive = !exportMode
+        final boolean scrollActive = !overrideMode
                 && TooltipNavigationConfig.scrollableTooltip()
                 && bodyH > MAX_BODY_H;
         final int clampedBodyH = scrollActive ? MAX_BODY_H : bodyH;
@@ -537,9 +547,9 @@ public class TooltipRenderer {
             if (panelY < 6) panelY = 6;
         }
 
-        if (exportMode) {
-            exportState.recordPanel(panelW, panelH);
-            if (exportState.measureOnly) {
+        if (overrideMode) {
+            renderState.recordPanel(panelW, panelH);
+            if (renderState.measureOnly) {
                 context.getMatrices().pop();
                 return;
             }
@@ -549,7 +559,7 @@ public class TooltipRenderer {
         TooltipPainter.drawGradientBackground(context, panelX, panelY, panelW, panelH, theme);
 
         BackgroundMotif motif = MotifRegistry.get(resolvedMotifKey);
-        long renderTimeMs = exportMode ? exportState.absoluteTimeMs : System.currentTimeMillis();
+        long renderTimeMs = overrideMode ? renderState.absoluteTimeMs : System.currentTimeMillis();
         if (motif != null) motif.draw(context, panelX, panelY, panelW, panelH, renderTimeMs);
 
         BorderRenderer.drawDecorativeBorder(context, panelX, panelY, panelW, panelH, theme, borderDef);
@@ -639,9 +649,9 @@ public class TooltipRenderer {
             case "drop_bounce" -> TooltipPainter.drawDropBounceText(context, tr, displayTitle, nameX, nameY, theme.name(), tooltipElapsedMs, theme.textShadow());
             case "hinge_fall" -> {
                 // Clip title animation to tooltip bounds so off-panel motion stays hidden.
-                if (!exportMode) context.enableScissor(panelX + 1, panelY + 1, panelX + panelW - 1, panelY + panelH - 1);
+                if (!overrideMode) context.enableScissor(panelX + 1, panelY + 1, panelX + panelW - 1, panelY + panelH - 1);
                 TooltipPainter.drawHingeFallText(context, tr, displayTitle, nameX, nameY, theme.name(), tooltipElapsedMs, theme.textShadow());
-                if (!exportMode) context.disableScissor();
+                if (!overrideMode) context.disableScissor();
             }
             case "obfuscate" -> TooltipPainter.drawObfuscateText(context, tr, displayTitle, nameX, nameY, theme.name(), tooltipElapsedMs, theme.textShadow());
             case "static"  -> context.drawText(tr, Text.literal(displayTitle).setStyle(
@@ -1048,7 +1058,7 @@ public class TooltipRenderer {
         }
 
         // Record whether this frame had an active scroll region (used by MOUSE_SCROLLED to consume the event).
-        if (!exportMode) {
+        if (!overrideMode) {
             ScrollState.setScrollableActive(scrollActive);
             TooltipGifRecorder.markTooltipRendered(panelX, panelY, panelW, panelH);
         }
@@ -1742,6 +1752,10 @@ public class TooltipRenderer {
         final List<Text> rawLines;
         final boolean   altDown;
         final int       maxW;
+        // Compared by identity: every Studio edit yields a fresh record, so the cache drops
+        // naturally, while the hover path keeps null on both sides and never rebuilds.
+        final ThemeDefinition forcedDef;
+        final List<String> forcedBadges;
 
         // --- Cached results ---
         final ModernTooltipModel model;
@@ -1765,6 +1779,7 @@ public class TooltipRenderer {
         final int                 statValueColumnW;
 
         ModelBuildCache(ItemStack stack, List<Text> rawLines, boolean altDown, int maxW,
+                        ThemeDefinition forcedDef, List<String> forcedBadges,
                         ModernTooltipModel model, ThemeDefinition resolvedDef,
                         BorderDefinition borderDef, String resolvedMotifKey,
                         String itemAnimStyle, String titleAnimStyle, String itemBorderShape,
@@ -1778,6 +1793,8 @@ public class TooltipRenderer {
             this.rawLines         = rawLines;
             this.altDown          = altDown;
             this.maxW             = maxW;
+            this.forcedDef        = forcedDef;
+            this.forcedBadges     = forcedBadges;
             this.model            = model;
             this.resolvedDef      = resolvedDef;
             this.borderDef        = borderDef;

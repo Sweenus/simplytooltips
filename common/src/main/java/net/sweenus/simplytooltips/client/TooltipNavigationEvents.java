@@ -28,6 +28,8 @@ public class TooltipNavigationEvents {
      * Must be called during client initialisation on both platforms.
      */
     public static void register() {
+        TooltipCommands.register();
+
         // Mouse scroll is handled by ScreenScrollMixin, which intercepts Screen#mouseScrolled
         // directly. This is more reliable than Architectury's MOUSE_SCROLLED event for the
         // inventory-screen context on Fabric.
