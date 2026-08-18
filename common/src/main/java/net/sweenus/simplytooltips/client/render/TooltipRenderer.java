@@ -607,7 +607,7 @@ public class TooltipRenderer {
         context.drawItem(stack, 0, 0);
         context.getMatrices().pop();
         TooltipPainter.drawItemFrameProgressLabel(context, tr, model.itemFrameProgress(),
-                iconFrameX + 26, iconFrameY - 2, tooltipElapsedMs);
+                iconFrameX + 26, iconFrameY - 2, tooltipElapsedMs, theme.textShadow());
 
         // ---- Header: title + badges ----
         int nameX = panelX + padding() + iconAreaW;
@@ -630,24 +630,24 @@ public class TooltipRenderer {
             context.getMatrices().translate(-nameX, -nameY, 0);
         }
         switch (titleAnimStyle != null ? titleAnimStyle : "wave") {
-            case "shimmer" -> TooltipPainter.drawShimmerText(context, tr, displayTitle, nameX, nameY, theme.name(), iconTimeMs);
-            case "pulse"   -> TooltipPainter.drawPulseText(context, tr, displayTitle, nameX, nameY, theme.name(), iconTimeMs);
-            case "flicker" -> TooltipPainter.drawFlickerText(context, tr, displayTitle, nameX, nameY, theme.name(), iconTimeMs);
-            case "shiver", "shivering" -> TooltipPainter.drawShiverText(context, tr, displayTitle, nameX, nameY, theme.name(), iconTimeMs);
-            case "quiver"  -> TooltipPainter.drawQuiverText(context, tr, displayTitle, nameX, nameY, theme.name(), iconTimeMs);
-            case "breathe_spin_bob" -> TooltipPainter.drawBreatheSpinBobText(context, tr, displayTitle, nameX, nameY, theme.name(), iconTimeMs);
-            case "drop_bounce" -> TooltipPainter.drawDropBounceText(context, tr, displayTitle, nameX, nameY, theme.name(), tooltipElapsedMs);
+            case "shimmer" -> TooltipPainter.drawShimmerText(context, tr, displayTitle, nameX, nameY, theme.name(), iconTimeMs, theme.textShadow());
+            case "pulse"   -> TooltipPainter.drawPulseText(context, tr, displayTitle, nameX, nameY, theme.name(), iconTimeMs, theme.textShadow());
+            case "flicker" -> TooltipPainter.drawFlickerText(context, tr, displayTitle, nameX, nameY, theme.name(), iconTimeMs, theme.textShadow());
+            case "shiver", "shivering" -> TooltipPainter.drawShiverText(context, tr, displayTitle, nameX, nameY, theme.name(), iconTimeMs, theme.textShadow());
+            case "quiver"  -> TooltipPainter.drawQuiverText(context, tr, displayTitle, nameX, nameY, theme.name(), iconTimeMs, theme.textShadow());
+            case "breathe_spin_bob" -> TooltipPainter.drawBreatheSpinBobText(context, tr, displayTitle, nameX, nameY, theme.name(), iconTimeMs, theme.textShadow());
+            case "drop_bounce" -> TooltipPainter.drawDropBounceText(context, tr, displayTitle, nameX, nameY, theme.name(), tooltipElapsedMs, theme.textShadow());
             case "hinge_fall" -> {
                 // Clip title animation to tooltip bounds so off-panel motion stays hidden.
                 if (!exportMode) context.enableScissor(panelX + 1, panelY + 1, panelX + panelW - 1, panelY + panelH - 1);
-                TooltipPainter.drawHingeFallText(context, tr, displayTitle, nameX, nameY, theme.name(), tooltipElapsedMs);
+                TooltipPainter.drawHingeFallText(context, tr, displayTitle, nameX, nameY, theme.name(), tooltipElapsedMs, theme.textShadow());
                 if (!exportMode) context.disableScissor();
             }
-            case "obfuscate" -> TooltipPainter.drawObfuscateText(context, tr, displayTitle, nameX, nameY, theme.name(), tooltipElapsedMs);
+            case "obfuscate" -> TooltipPainter.drawObfuscateText(context, tr, displayTitle, nameX, nameY, theme.name(), tooltipElapsedMs, theme.textShadow());
             case "static"  -> context.drawText(tr, Text.literal(displayTitle).setStyle(
                                   Style.EMPTY.withColor(TextColor.fromRgb(theme.name() & 0x00FFFFFF))),
-                                  nameX, nameY, theme.name(), true);
-            default        -> TooltipPainter.drawWaveText(context, tr, displayTitle, nameX, nameY, theme.name(), iconTimeMs);
+                                  nameX, nameY, theme.name(), theme.textShadow());
+            default        -> TooltipPainter.drawWaveText(context, tr, displayTitle, nameX, nameY, theme.name(), iconTimeMs, theme.textShadow());
         }
         if (titleScale < 1.0f) context.getMatrices().pop();
 
@@ -715,7 +715,7 @@ public class TooltipRenderer {
             context.drawText(tr,
                     Text.literal("\u25C6 " + abilitySection.header()).setStyle(Style.EMPTY.withColor(
                             TextColor.fromRgb(theme.sectionHeader() & 0x00FFFFFF))),
-                    panelX + padding(), cursorY, theme.sectionHeader(), true);
+                    panelX + padding(), cursorY, theme.sectionHeader(), theme.textShadow());
             cursorY += lineHeight + sectionGap;
             boolean sawAbilityContent = false;
             for (String line : wrappedAbility) {
@@ -729,14 +729,14 @@ public class TooltipRenderer {
                     context.drawText(tr,
                             Text.literal(headerText).setStyle(Style.EMPTY.withColor(
                                     TextColor.fromRgb(theme.sectionHeader() & 0x00FFFFFF))),
-                            panelX + padding(), cursorY, theme.sectionHeader(), true);
+                            panelX + padding(), cursorY, theme.sectionHeader(), theme.textShadow());
                     cursorY += lineHeight + sectionGap;
                 } else {
                     int lineColor = isCooldownLine(line) ? COOLDOWN_TEXT_COLOR : theme.body();
                     context.drawText(tr,
                             Text.literal(line).setStyle(Style.EMPTY.withColor(
                                     TextColor.fromRgb(lineColor & 0x00FFFFFF))),
-                            panelX + padding(), cursorY, lineColor, true);
+                            panelX + padding(), cursorY, lineColor, theme.textShadow());
                     cursorY += lineHeight;
                     if (!line.trim().isEmpty()) {
                         sawAbilityContent = true;
@@ -755,7 +755,7 @@ public class TooltipRenderer {
                 context.drawText(tr,
                         Text.literal(line).setStyle(Style.EMPTY.withColor(
                                 TextColor.fromRgb(theme.body() & 0x00FFFFFF))),
-                        panelX + padding(), cursorY, theme.body(), true);
+                        panelX + padding(), cursorY, theme.body(), theme.textShadow());
                 cursorY += lineHeight;
             }
         }
@@ -772,7 +772,7 @@ public class TooltipRenderer {
             context.drawText(tr,
                     Text.literal("\u25C6 Upgrades").setStyle(Style.EMPTY.withColor(
                             TextColor.fromRgb(theme.sectionHeader() & 0x00FFFFFF))),
-                    leftX, cursorY, theme.sectionHeader(), true);
+                    leftX, cursorY, theme.sectionHeader(), theme.textShadow());
             cursorY += lineHeight + sectionGap;
 
             int pipSequenceBase = 0;
@@ -878,7 +878,7 @@ public class TooltipRenderer {
             context.drawText(tr,
                     Text.literal("\u25C6 Rune").setStyle(Style.EMPTY.withColor(
                             TextColor.fromRgb(theme.sectionHeader() & 0x00FFFFFF))),
-                    leftX, cursorY, theme.sectionHeader(), true);
+                    leftX, cursorY, theme.sectionHeader(), theme.textShadow());
             cursorY += lineHeight + sectionGap;
 
             context.drawText(tr,
@@ -923,7 +923,7 @@ public class TooltipRenderer {
                     context.drawText(tr,
                             Text.literal(headerText).setStyle(Style.EMPTY.withColor(
                                     TextColor.fromRgb(theme.sectionHeader() & 0x00FFFFFF))),
-                            contentLeft, cursorY, theme.sectionHeader(), true);
+                            contentLeft, cursorY, theme.sectionHeader(), theme.textShadow());
                     cursorY += lineHeight + sectionGap;
                 } else {
                     InlineStatRow stat = bodyStats.get(i);
@@ -931,7 +931,8 @@ public class TooltipRenderer {
                         drawInlineStatRow(context, tr, stat, contentLeft, contentRight, cursorY, theme, statValueColumnW);
                     } else {
                         drawTextWithHighlightedNumbers(context, tr, line,
-                                contentLeft, cursorY, theme.body(), theme.sectionHeader());
+                                contentLeft, cursorY, theme.body(), theme.sectionHeader(),
+                                theme.textShadow());
                     }
                     cursorY += statRowHeight(stat, lineHeight) + BODY_LINE_EXTRA_GAP;
                 }
@@ -954,7 +955,8 @@ public class TooltipRenderer {
                     drawInlineStatRow(context, tr, stat, contentLeft, contentRight, cursorY, theme, statValueColumnW);
                 } else {
                     drawTextWithHighlightedNumbers(context, tr, line,
-                            contentLeft, cursorY, extraColor, theme.sectionHeader());
+                            contentLeft, cursorY, extraColor, theme.sectionHeader(),
+                            theme.textShadow());
                 }
                 cursorY += statRowHeight(stat, lineHeight) + BODY_LINE_EXTRA_GAP;
             }
@@ -983,7 +985,7 @@ public class TooltipRenderer {
                     context.drawText(tr,
                             Text.literal(headerText).setStyle(Style.EMPTY.withColor(
                                     TextColor.fromRgb(theme.sectionHeader() & 0x00FFFFFF))),
-                            contentLeft, cursorY, theme.sectionHeader(), true);
+                            contentLeft, cursorY, theme.sectionHeader(), theme.textShadow());
                     cursorY += lineHeight + sectionGap;
                 } else if (line.equals(ModernTooltipModel.AFFIX_DIVIDER)) {
                     pendingLeadingRomanColor = 0;
@@ -1021,7 +1023,7 @@ public class TooltipRenderer {
                             && wrappedAffixes.get(i + 1).equals(ModernTooltipModel.AFFIX_DIVIDER);
                     pendingLeadingRomanColor = drawAffixTextWithHighlights(context, tr, line,
                             contentLeft, cursorY, lineBaseColor, lineNumberColor,
-                            pendingLeadingRomanColor, altDown);
+                            pendingLeadingRomanColor, altDown, theme.textShadow());
                     cursorY += lineHeight + (nextIsDivider ? 0 : BODY_LINE_EXTRA_GAP);
                     if (!line.trim().isEmpty()) sawAffixContent = true;
                 }
@@ -1283,11 +1285,11 @@ public class TooltipRenderer {
         context.drawText(tr,
                 Text.literal(stat.label()).setStyle(Style.EMPTY.withColor(
                         TextColor.fromRgb(theme.body() & 0x00FFFFFF))),
-                contentLeft, y, theme.body(), true);
+                contentLeft, y, theme.body(), theme.textShadow());
         context.drawText(tr,
                 Text.literal(valueText).setStyle(Style.EMPTY.withColor(
                         TextColor.fromRgb(theme.sectionHeader() & 0x00FFFFFF))),
-                valueX, y, theme.sectionHeader(), true);
+                valueX, y, theme.sectionHeader(), theme.textShadow());
 
         int barStart = contentLeft + labelColumnW + 8;
         int barEnd = (contentRight - valueColumnW) - 8;
@@ -1459,9 +1461,10 @@ public class TooltipRenderer {
      */
     private static void drawTextWithHighlightedNumbers(DrawContext context, TextRenderer tr,
                                                        String text, int x, int y,
-                                                       int baseColor, int numberColor) {
+                                                       int baseColor, int numberColor,
+                                                       boolean shadow) {
         drawTextRangeWithNumberHighlight(context, tr, text, 0, text != null ? text.length() : 0,
-                x, y, baseColor, numberColor);
+                x, y, baseColor, numberColor, shadow);
     }
 
     private static boolean isSocketsSectionTitle(String sectionTitle) {
@@ -1478,7 +1481,8 @@ public class TooltipRenderer {
                                                     String text, int x, int y,
                                                     int baseColor, int numberColor,
                                                     int carryLeadingRomanColor,
-                                                    boolean showBracketedText) {
+                                                    boolean showBracketedText,
+                                                    boolean shadow) {
         if (text == null || text.isEmpty()) return 0;
 
         int len = text.length();
@@ -1519,7 +1523,7 @@ public class TooltipRenderer {
         for (int i = 0; i < len; i++) {
             if (hidden[i]) {
                 if (segStart >= 0) {
-                    curX = drawTextSegment(context, tr, text.substring(segStart, i), curX, y, segColor);
+                    curX = drawTextSegment(context, tr, text.substring(segStart, i), curX, y, segColor, shadow);
                     segStart = -1;
                 }
                 continue;
@@ -1529,13 +1533,13 @@ public class TooltipRenderer {
                 segStart = i;
                 segColor = colors[i];
             } else if (colors[i] != segColor) {
-                curX = drawTextSegment(context, tr, text.substring(segStart, i), curX, y, segColor);
+                curX = drawTextSegment(context, tr, text.substring(segStart, i), curX, y, segColor, shadow);
                 segStart = i;
                 segColor = colors[i];
             }
         }
         if (segStart >= 0) {
-            drawTextSegment(context, tr, text.substring(segStart), curX, y, segColor);
+            drawTextSegment(context, tr, text.substring(segStart), curX, y, segColor, shadow);
         }
         return trailingEffectColor(text);
     }
@@ -1543,7 +1547,8 @@ public class TooltipRenderer {
     private static int drawTextRangeWithNumberHighlight(DrawContext context, TextRenderer tr,
                                                          String text, int start, int end,
                                                          int x, int y,
-                                                         int baseColor, int numberColor) {
+                                                         int baseColor, int numberColor,
+                                                         boolean shadow) {
         if (text == null || start >= end) return x;
 
         String segment = text.substring(start, end);
@@ -1553,22 +1558,22 @@ public class TooltipRenderer {
 
         while (m.find()) {
             if (m.start() > lastEnd) {
-                curX = drawTextSegment(context, tr, segment.substring(lastEnd, m.start()), curX, y, baseColor);
+                curX = drawTextSegment(context, tr, segment.substring(lastEnd, m.start()), curX, y, baseColor, shadow);
             }
-            curX = drawTextSegment(context, tr, m.group(1), curX, y, numberColor);
+            curX = drawTextSegment(context, tr, m.group(1), curX, y, numberColor, shadow);
             lastEnd = m.end();
         }
 
         if (lastEnd < segment.length()) {
-            curX = drawTextSegment(context, tr, segment.substring(lastEnd), curX, y, baseColor);
+            curX = drawTextSegment(context, tr, segment.substring(lastEnd), curX, y, baseColor, shadow);
         }
 
         return curX;
     }
 
-    private static int drawTextSegment(DrawContext context, TextRenderer tr, String seg, int x, int y, int color) {
+    private static int drawTextSegment(DrawContext context, TextRenderer tr, String seg, int x, int y, int color, boolean shadow) {
         if (seg == null || seg.isEmpty()) return x;
-        context.drawText(tr, Text.literal(seg), x, y, color, true);
+        context.drawText(tr, Text.literal(seg), x, y, color, shadow);
         return x + tr.getWidth(seg);
     }
 

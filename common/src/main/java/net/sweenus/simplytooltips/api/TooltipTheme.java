@@ -22,7 +22,8 @@ public record TooltipTheme(
         int runeColor,
         int slotFilled,
         int slotEmpty,
-        int hint
+        int hint,
+        boolean textShadow
 ) {
     public static TooltipTheme defaultTheme() {
         return new TooltipTheme(
@@ -30,8 +31,19 @@ public record TooltipTheme(
                 0xFFFFF0CC, 0xFFEEEEEE, 0xFF141008, 0xFFFFD5A0,
                 0xFFE6ECF5, 0xFF8A6A1E, 0xFFE2A834, 0xFF2A1E0A,
                 0xFF8A6A1E, 0xFF9D62CA, 0xFF5E8ACF, 0xFFDB5E71,
-                0xFFE2A834, 0xFF3D3020, 0xFFC7D2E2
+                0xFFE2A834, 0xFF3D3020, 0xFFC7D2E2, true
         );
+    }
+
+    public TooltipTheme(
+            int border, int borderInner, int bgTop, int bgBottom, int name,
+            int badgeBg, int badgeCutout, int sectionHeader, int body, int separator,
+            int diamondFrame, int diamondFrameInner, int footerDot, int stringColor,
+            int frameColor, int runeColor, int slotFilled, int slotEmpty, int hint
+    ) {
+        this(border, borderInner, bgTop, bgBottom, name, badgeBg, badgeCutout, sectionHeader,
+                body, separator, diamondFrame, diamondFrameInner, footerDot, stringColor,
+                frameColor, runeColor, slotFilled, slotEmpty, hint, true);
     }
 
     /**
@@ -60,8 +72,18 @@ public record TooltipTheme(
                 color(json, "runeColor",         d.runeColor()),
                 color(json, "slotFilled",        d.slotFilled()),
                 color(json, "slotEmpty",         d.slotEmpty()),
-                color(json, "hint",              d.hint())
+                color(json, "hint",              d.hint()),
+                bool(json, "textShadow",         d.textShadow())
         );
+    }
+
+    private static boolean bool(JsonObject json, String key, boolean fallback) {
+        if (!json.has(key)) return fallback;
+        try {
+            return json.get(key).getAsBoolean();
+        } catch (RuntimeException e) {
+            return fallback;
+        }
     }
 
     private static int color(JsonObject json, String key, int fallback) {

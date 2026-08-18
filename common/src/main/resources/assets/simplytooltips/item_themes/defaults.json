@@ -69,9 +69,9 @@
     "simplyswords:frostfall":            { "theme": "ice",       "badges": ["UNIQUE", "HAMMER"]     },
     "simplyswords:soulpyre":             { "theme": "soul",      "badges": ["UNIQUE", "GREATAXE"]   },
     "simplyswords:molten_edge":          { "theme": "ember",     "badges": ["UNIQUE", "AXE"]        },
-    "simplyswords:livyatan":             { "theme": "ice",       "badges": ["UNIQUE", "AXE"]        },
+    "simplyswords:livyatan":             { "theme": "bubble",    "badges": ["UNIQUE", "AXE"]        },
     "simplyswords:icewhisper":           { "theme": "ice",       "badges": ["UNIQUE", "HALBERD"]    },
-    "simplyswords:arcanethyst":          { "theme": "enchanted", "badges": ["UNIQUE", "HALBERD"]    },
+    "simplyswords:arcanethyst":          { "theme": "amethyst",  "badges": ["UNIQUE", "HALBERD"]    },
     "simplyswords:thunderbrand":         { "theme": "lightning", "badges": ["UNIQUE", "HALBERD"]    },
     "simplyswords:hearthflame":          { "theme": "ember",     "badges": ["UNIQUE", "GREATHAMMER"]},
     "simplyswords:twisted_blade":        { "theme": "echo",      "badges": ["UNIQUE", "CLAYMORE"]   },
@@ -110,15 +110,13 @@
     "simplyswords:stormscale":           { "theme": "lightning", "badges": ["UNIQUE", "GLAIVE"]     },
     "simplyswords:ionbound_stormscale":  { "theme": "lightning", "badges": ["UNIQUE", "GLAIVE"]     },
     "simplyswords:bloodwake":            { "theme": "blood",     "badges": ["UNIQUE", "CUTLASS"]    },
+    "simplyswords:riftmane":             { "theme": "spectral",  "badges": ["UNIQUE", "CLAYMORE"]   },
+    "simplyswords:dawnquiver":           { "theme": "radiant",   "badges": ["UNIQUE", "CLAYMORE"]   },
 
     "simplyswords:the_devourer":         { "theme": "corrupted_eye", "badges": ["UNIQUE", "CLAYMORE"] },
     "simplyswords:wraithmaw":            { "theme": "corrupted_eye", "badges": ["UNIQUE", "CUTLASS"]  },
     "simplyswords:soulstalker":          { "theme": "corrupted_eye", "badges": ["UNIQUE", "SCYTHE"]   },
     "simplyswords:gloampiercer":         { "theme": "corrupted_eye", "badges": ["UNIQUE", "SPEAR"]    },
-
-    "simplyswords:riftmane":             { "theme": "spectral",  "badges": ["UNIQUE", "CLAYMORE"]   },
-
-    "simplyswords:dawnquiver":           { "theme": "radiant",   "badges": ["UNIQUE", "CLAYMORE"]   },
 
     "simplyswords:contained_remnant":     { "theme": "autumn",         "badges": ["UPGRADE"] },
     "simplyswords:tampered_remnant":      { "theme": "obfuscated",     "badges": ["UPGRADE"] },
@@ -126,7 +124,7 @@
     "simplyswords:netherfused_gem":       { "theme": "ember",          "badges": ["UPGRADE"] },
     "simplyswords:runefused_gem":         { "theme": "runic",          "badges": ["UPGRADE"] },
     "simplyswords:runic_tablet":          { "theme": "runic",          "badges": ["UPGRADE"] },
-    "simplyswords:runic_forge":           { "theme": "runic",          "badges": ["WORKBENCH"] },
+    "simplyswords:runic_forge":           { "theme": "runic",           "badges": ["WORKBENCH"] },
 
     "simplybows:upgrades/rune_etching_grace":               { "theme": "autumn",    "badges": ["UPGRADE"] },
     "simplybows:upgrades/rune_etching_pain":                { "theme": "autumn",    "badges": ["UPGRADE"] },

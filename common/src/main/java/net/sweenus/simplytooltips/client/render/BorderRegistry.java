@@ -48,6 +48,8 @@ public class BorderRegistry {
         PATTERNS.put("spectral",  new SpectralBorder());
         PATTERNS.put("radiant",   new RadiantBorder());
         PATTERNS.put("candle",    new CandleBorder());
+        PATTERNS.put("amethyst",  new AmethystBorder());
+        PATTERNS.put("tome",      new TomeBorder());
     }
 
     /**

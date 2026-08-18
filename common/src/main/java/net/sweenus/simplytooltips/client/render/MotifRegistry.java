@@ -46,6 +46,8 @@ public class MotifRegistry {
         MOTIFS.put("spectral",  new SpectralMotif());
         MOTIFS.put("radiant",   new RadiantMotif());
         MOTIFS.put("candle",    new CandleMotif());
+        MOTIFS.put("amethyst",  new AmethystMotif());
+        MOTIFS.put("tome",      new TomeMotif());
     }
 
     /**

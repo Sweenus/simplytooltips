@@ -288,7 +288,7 @@ These are the built-in values you can reuse in your own theme JSON.
 ### `motif`
 
 - `none`
-- `vine`, `ember`, `enchanted`, `bee`, `blossom`, `bubble`, `earth`, `echo`, `cosmic`, `ice`, `lightning`, `autumn`, `soul`, `deepdark`, `poison`, `blood`, `ocean`, `rustic`, `honey`, `jade`, `wood`, `stone`, `iron`, `gold`, `diamond`, `netherite`, `runic`, `corrupted_eye`, `spectral`, `radiant`, `candle`
+- `vine`, `ember`, `enchanted`, `bee`, `blossom`, `bubble`, `earth`, `echo`, `cosmic`, `ice`, `lightning`, `autumn`, `soul`, `deepdark`, `poison`, `blood`, `ocean`, `rustic`, `honey`, `jade`, `wood`, `stone`, `iron`, `gold`, `diamond`, `netherite`, `runic`, `corrupted_eye`, `spectral`, `radiant`, `candle`, `amethyst`, `tome`
 
 ### `borderStyle`
 
@@ -318,6 +318,15 @@ These are the built-in values you can reuse in your own theme JSON.
 - `obfuscate`
 - `static`
 
+### `textShadow`
+
+- `true` (default) — text is drawn with Minecraft's built-in drop shadow.
+- `false` — text is drawn flat, with no shadow.
+
+Minecraft derives the shadow by darkening the text colour, so on a **light background with dark
+text** the shadow is near-black and smears the 1px glyph strokes. Light themes should set this to
+`false`. Omitting the key keeps the shadow, so existing themes are unaffected.
+
 ### `itemBorderShape`
 
 - `diamond`
@@ -335,7 +344,7 @@ These are the built-in values you can reuse in your own theme JSON.
 
 Built-in theme keys you can reference directly:
 
-- `autumn`, `bee`, `blood`, `blossom`, `bubble`, `candle`, `corrupted_eye`, `cosmic`, `deepdark`, `default`, `diamond`, `earth`, `echo`, `ember`, `enchanted`, `gold`, `honey`, `ice`, `iron`, `jade`, `lightning`, `netherite`, `obfuscated`, `ocean`, `poison`, `radiant`, `rarity_common`, `rarity_epic`, `rarity_mythic`, `rarity_rare`, `rarity_uncommon`, `runic`, `rustic`, `soul`, `spectral`, `stone`, `unstable`, `vine`, `wood`
+- `amethyst`, `autumn`, `bee`, `blood`, `blossom`, `bubble`, `candle`, `corrupted_eye`, `cosmic`, `deepdark`, `default`, `diamond`, `earth`, `echo`, `ember`, `enchanted`, `gold`, `honey`, `ice`, `iron`, `jade`, `lightning`, `netherite`, `obfuscated`, `ocean`, `poison`, `radiant`, `rarity_common`, `rarity_epic`, `rarity_mythic`, `rarity_rare`, `rarity_uncommon`, `runic`, `rustic`, `soul`, `spectral`, `stone`, `tome`, `unstable`, `vine`, `wood`
 
 ## 7) Reload and Test
 
