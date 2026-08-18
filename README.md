@@ -380,6 +380,9 @@ The screen has three columns:
   | Double-click | Back to fit |
   | Tab chips / `G` | Switch tab, when the item has more than one and `general.tooltipTabs` is on |
 
+  Typing in the item field suggests matching ids: `Up`/`Down` to highlight one, `Tab` or `Enter` to
+  accept it, `Esc` to dismiss the list, or just click a row.
+
   The preview honours `general.tooltipTabs`: with tabs on you get the same tab dots and key hint the
   real tooltip shows, and with tabs off every section is stacked in one panel — whichever the player
   would actually see.

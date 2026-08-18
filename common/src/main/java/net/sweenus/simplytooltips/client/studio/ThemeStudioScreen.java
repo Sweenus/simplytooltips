@@ -82,6 +82,8 @@ public class ThemeStudioScreen extends Screen {
     private long statusUntilMs;
 
     private List<String> suggestions = List.of();
+    /** Keyboard highlight in the suggestion list; -1 when nothing is highlighted yet. */
+    private int suggestionIndex = -1;
 
     // Panel geometry, recomputed in init().
     private int panelX;
@@ -346,6 +348,37 @@ public class ThemeStudioScreen extends Screen {
         assignButton.active = preview.hasItem();
     }
 
+    private boolean suggestionsVisible() {
+        return !suggestions.isEmpty() && itemField.isFocused();
+    }
+
+    private int suggestionListX() {
+        return itemField.getX() - 4;
+    }
+
+    private int suggestionListW() {
+        return itemField.getWidth() + 8;
+    }
+
+    private int suggestionListY() {
+        return itemField.getY() + 12;
+    }
+
+    private void acceptSuggestion(int index) {
+        if (index < 0 || index >= suggestions.size()) return;
+        itemField.setText(suggestions.get(index));
+        suggestions = List.of();
+        suggestionIndex = -1;
+    }
+
+    private void moveSuggestion(int delta) {
+        int size = suggestions.size();
+        if (size == 0) return;
+        suggestionIndex = suggestionIndex < 0
+                ? (delta > 0 ? 0 : size - 1)
+                : Math.floorMod(suggestionIndex + delta, size);
+    }
+
     private void onBadgesTyped(String text) {
         List<String> parsed = splitList(text);
         badgeOverride = parsed.isEmpty() ? null : parsed;
@@ -355,6 +388,7 @@ public class ThemeStudioScreen extends Screen {
     private void onItemTyped(String text) {
         suggestions = TooltipPreviewPane.suggest(text, 7);
         if (suggestions.size() == 1 && suggestions.get(0).equals(text.trim())) suggestions = List.of();
+        suggestionIndex = -1;
         preview.setItem(text);
     }
 
@@ -467,7 +501,7 @@ public class ThemeStudioScreen extends Screen {
             if (dropdown.isOpen() && dropdown.clickPopup(mouseX, mouseY)) return true;
         }
 
-        if (!suggestions.isEmpty() && clickSuggestion(mouseX, mouseY)) return true;
+        if (suggestionsVisible() && clickSuggestion(mouseX, mouseY)) return true;
 
         // Close button.
         if (StudioTheme.inside(mouseX, mouseY, panelX + panelW - 14, panelY + 3, 11, 11)) {
@@ -496,14 +530,11 @@ public class ThemeStudioScreen extends Screen {
     }
 
     private boolean clickSuggestion(double mouseX, double mouseY) {
-        int sx = itemField.getX() - 4;
-        int sw = itemField.getWidth() + 8;
-        int sy = itemField.getY() + 12;
-        if (!StudioTheme.inside(mouseX, mouseY, sx, sy, sw, suggestions.size() * StudioTheme.ROW_H)) return false;
-        int index = (int) ((mouseY - sy) / StudioTheme.ROW_H);
-        if (index < 0 || index >= suggestions.size()) return false;
-        itemField.setText(suggestions.get(index));
-        suggestions = List.of();
+        if (!SuggestionGeometry.contains(suggestionListX(), suggestionListY(), suggestionListW(),
+                suggestions.size(), mouseX, mouseY)) {
+            return false;
+        }
+        acceptSuggestion(SuggestionGeometry.indexAt(suggestionListY(), suggestions.size(), mouseY));
         return true;
     }
 
@@ -589,6 +620,29 @@ public class ThemeStudioScreen extends Screen {
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (suggestionsVisible()) {
+            switch (keyCode) {
+                case GLFW.GLFW_KEY_DOWN -> {
+                    moveSuggestion(1);
+                    return true;
+                }
+                case GLFW.GLFW_KEY_UP -> {
+                    moveSuggestion(-1);
+                    return true;
+                }
+                case GLFW.GLFW_KEY_TAB, GLFW.GLFW_KEY_ENTER, GLFW.GLFW_KEY_KP_ENTER -> {
+                    acceptSuggestion(suggestionIndex < 0 ? 0 : suggestionIndex);
+                    return true;
+                }
+                case GLFW.GLFW_KEY_ESCAPE -> {
+                    suggestions = List.of();
+                    suggestionIndex = -1;
+                    return true;
+                }
+                default -> { }
+            }
+        }
+
         if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
             if (picker != null) {
                 picker = null;
@@ -884,21 +938,36 @@ public class ThemeStudioScreen extends Screen {
     }
 
     private void drawSuggestions(DrawContext context, int mouseX, int mouseY) {
-        if (suggestions.isEmpty() || !itemField.isFocused()) return;
-        int sx = itemField.getX() - 4;
-        int sw = itemField.getWidth() + 8;
-        int sy = itemField.getY() + 12;
-        int sh = suggestions.size() * StudioTheme.ROW_H + 2;
+        if (!suggestionsVisible()) return;
+        int sx = suggestionListX();
+        int sw = suggestionListW();
+        int sy = suggestionListY();
 
-        StudioTheme.card(context, sx, sy, sw, sh, 0xFF0C0E13, StudioTheme.ACCENT_DIM);
+        StudioTheme.card(context, sx, sy, sw, SuggestionGeometry.height(suggestions.size()),
+                0xFF0C0E13, StudioTheme.ACCENT_DIM);
+
         for (int i = 0; i < suggestions.size(); i++) {
-            int ry = sy + 1 + i * StudioTheme.ROW_H;
+            int ry = SuggestionGeometry.rowY(sy, i);
+            boolean selected = i == suggestionIndex;
             boolean hot = StudioTheme.inside(mouseX, mouseY, sx + 1, ry, sw - 2, StudioTheme.ROW_H);
-            if (hot) context.fill(sx + 1, ry, sx + sw - 1, ry + StudioTheme.ROW_H, StudioTheme.HOVER);
+
+            if (selected) {
+                context.fill(sx + 1, ry, sx + sw - 1, ry + StudioTheme.ROW_H, StudioTheme.ACCENT_SOFT);
+                context.fill(sx + 1, ry, sx + 3, ry + StudioTheme.ROW_H, StudioTheme.ACCENT);
+            } else if (hot) {
+                context.fill(sx + 1, ry, sx + sw - 1, ry + StudioTheme.ROW_H, StudioTheme.HOVER);
+            }
+
             context.drawText(textRenderer,
                     StudioTheme.trim(textRenderer, suggestions.get(i), sw - 10),
-                    sx + 5, ry + 2, hot ? StudioTheme.TEXT_PRIMARY : StudioTheme.TEXT_BODY, false);
+                    sx + 5, ry + 2,
+                    selected || hot ? StudioTheme.TEXT_PRIMARY : StudioTheme.TEXT_BODY, false);
         }
+
+        String hint = Text.translatable("simplytooltips.studio.suggest.hint").getString();
+        context.drawText(textRenderer, StudioTheme.trim(textRenderer, hint, sw),
+                sx, sy + SuggestionGeometry.height(suggestions.size()) + 1,
+                StudioTheme.TEXT_DIM, false);
     }
 
     private void drawFooter(DrawContext context) {

@@ -2,7 +2,6 @@
   "simplytooltips.key.category": "Simply Tooltips",
   "key.simplytooltips.cycle_tab": "Cycle Tooltip Tab",
   "key.simplytooltips.capture_gif": "Capture Tooltip GIF",
-
   "simplytooltips.studio.title": "THEME STUDIO",
   "simplytooltips.studio.search": "search",
   "simplytooltips.studio.item": "item id",
@@ -20,7 +19,6 @@
   "simplytooltips.studio.new_name": "new theme key",
   "simplytooltips.studio.override.builtin": "Built-in themes cannot be overwritten",
   "simplytooltips.studio.override.clean": "No unsaved changes",
-
   "simplytooltips.studio.status.saved": "Saved theme '%s'",
   "simplytooltips.studio.status.assigned": "Mapped %s to '%s'",
   "simplytooltips.studio.status.reverted": "Reverted unsaved changes",
@@ -30,6 +28,6 @@
   "simplytooltips.studio.status.no_item": "Pick a valid item first",
   "simplytooltips.studio.status.held": "Loaded held item",
   "simplytooltips.studio.status.no_held": "You are not holding anything",
-
-  "simplytooltips.command.reloaded": "[Simply Tooltips] Reloaded user themes and mappings from %s"
+  "simplytooltips.command.reloaded": "[Simply Tooltips] Reloaded user themes and mappings from %s",
+  "simplytooltips.studio.suggest.hint": "Up/Down select   Tab accept"
 }
